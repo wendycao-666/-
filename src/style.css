@@ -1,0 +1,169 @@
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  line-height: 1.5;
+  color: #303133;
+  background: #f5f7fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+#app {
+  min-height: 100vh;
+}
+
+.app-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.app-main {
+  flex: 1;
+  padding: 16px;
+  max-width: 960px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.page {
+  width: 100%;
+}
+
+.page-title {
+  margin: 0 0 16px;
+  font-size: 20px;
+}
+
+.card-block {
+  border-radius: 8px !important;
+}
+
+.card-block :deep(.el-card__body) {
+  padding: 16px;
+}
+
+.stat-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.card-label {
+  font-size: 13px;
+  color: #909399;
+  margin-bottom: 6px;
+}
+
+.card-value {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.card-value.primary {
+  color: #409EFF;
+}
+
+.card-value.danger,
+.danger {
+  color: #F56C6C;
+}
+
+.card-value.warning,
+.warning {
+  color: #E6A23C;
+}
+
+.card-value.success,
+.success {
+  color: #67C23A;
+}
+
+.card-sub {
+  font-size: 13px;
+  color: #909399;
+}
+
+.card-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.risk-card {
+  border: 1px solid #F56C6C !important;
+  background: #fef0f0;
+}
+
+.over-budget {
+  margin-top: 8px;
+  color: #F56C6C;
+  font-weight: 600;
+}
+
+.house-card {
+  margin-bottom: 16px;
+}
+
+.house-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.house-main .page-title {
+  margin-bottom: 8px;
+}
+
+.house-address,
+.house-area {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #606266;
+}
+
+.nav-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.nav-item {
+  cursor: pointer;
+  text-align: center;
+  transition: box-shadow 0.2s;
+}
+
+.nav-item :deep(.el-card__body) {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px 16px !important;
+}
+
+.nav-item:hover {
+  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.15);
+}
+
+.el-button {
+  border-radius: 6px;
+}
+
+@media (max-width: 640px) {
+  .nav-grid {
+    grid-template-columns: 1fr;
+  }
+}
