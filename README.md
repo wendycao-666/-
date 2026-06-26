@@ -1,5 +1,30 @@
-# Vue 3 + Vite
+# 毛坯装修管理小工具
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+Vue3 + Vite + Element Plus 纯前端项目。
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+## 本地开发
+
+```bash
+npm install
+npm run dev
+```
+
+## GitHub Pages 部署
+
+站点地址：https://wendycao-666.github.io/-/
+
+### 首次配置（必做）
+
+打开仓库 **Settings → Pages**，设置：
+
+| 选项 | 值 |
+|------|-----|
+| Source | Deploy from a branch |
+| Branch | `main` |
+| Folder | **`/docs`**（不要选 / root） |
+
+保存后等待 1～2 分钟刷新页面。
+
+### 自动更新
+
+每次 push 到 `main` 分支，GitHub Actions 会自动构建并更新 `docs/` 目录。
