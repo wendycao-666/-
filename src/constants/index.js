@@ -69,6 +69,11 @@ export const ACCEPTANCE_RESULT = {
 
 export const BUDGET_CATEGORIES = ['人工', '主材', '辅材', '杂项']
 
+/** 系统预设预算条目 */
+export const BUDGET_TEMPLATES = [
+  { category: '杂项', name: '设计费', unitPrice: 0, quantity: 1, paidAmount: 0 },
+]
+
 export const EMPTY_TEXT = '暂无数据，请添加对应内容'
 
 export const ROUTES = {

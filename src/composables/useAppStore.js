@@ -7,6 +7,7 @@ import {
   PROCESS_WORKDAYS,
   PROJECT_START_DATE,
   SCHEDULE_VERSION,
+  BUDGET_TEMPLATES,
 } from '../constants'
 import { loadData, saveData } from '../utils/storage'
 import { todayStr } from '../utils/date'
@@ -60,6 +61,32 @@ function createDefaultMaterials() {
   }))
 }
 
+function createDefaultBudgets() {
+  return BUDGET_TEMPLATES.map((item, index) => ({
+    id: String(index + 1),
+    category: item.category,
+    name: item.name,
+    unitPrice: item.unitPrice,
+    quantity: item.quantity,
+    paidAmount: item.paidAmount,
+  }))
+}
+
+function ensureDefaultBudgets(budgets) {
+  BUDGET_TEMPLATES.forEach((template) => {
+    if (!budgets.some((b) => b.name === template.name)) {
+      budgets.unshift({
+        id: crypto.randomUUID(),
+        category: template.category,
+        name: template.name,
+        unitPrice: template.unitPrice,
+        quantity: template.quantity,
+        paidAmount: template.paidAmount,
+      })
+    }
+  })
+}
+
 function createDefaultState() {
   const processes = createDefaultProcesses()
   const materials = refreshAllMaterials(createDefaultMaterials(), processes)
@@ -68,7 +95,7 @@ function createDefaultState() {
     processes,
     materials,
     acceptances: [],
-    budgets: [],
+    budgets: createDefaultBudgets(),
     lastWarningRefreshDate: todayStr(),
   }
 }
@@ -97,7 +124,8 @@ function initStore() {
     }
     state.materials = refreshAllMaterials(saved.materials || createDefaultMaterials(), state.processes)
     state.acceptances = saved.acceptances || []
-    state.budgets = saved.budgets || []
+    state.budgets = saved.budgets || createDefaultBudgets()
+    ensureDefaultBudgets(state.budgets)
     state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
   }
   refreshWarningsIfNeeded()
