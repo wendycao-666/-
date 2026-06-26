@@ -1,8 +1,8 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// GitHub Pages 项目站地址：https://wendycao-666.github.io/-/
-const base = process.env.GITHUB_PAGES === 'true' ? '/-/' : '/'
+// GitHub Pages 项目站：https://wendycao-666.github.io/-/（仓库名含特殊字符，用相对路径更稳）
+const base = process.env.GITHUB_PAGES === 'true' ? './' : '/'
 
 export default defineConfig({
   base,
