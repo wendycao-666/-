@@ -7,11 +7,15 @@ import router from './router'
 import { useAppStore } from './composables/useAppStore'
 import './style.css'
 
-const app = createApp(App)
-app.use(ElementPlus, { locale: zhCn })
-app.use(router)
+async function bootstrap() {
+  const app = createApp(App)
+  app.use(ElementPlus, { locale: zhCn })
+  app.use(router)
 
-const { initStore } = useAppStore()
-initStore()
+  const { initStore } = useAppStore()
+  await initStore()
 
-app.mount('#app')
+  app.mount('#app')
+}
+
+bootstrap()

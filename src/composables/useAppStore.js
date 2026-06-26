@@ -19,6 +19,13 @@ import {
   calcProgress,
   calcMaterialStats,
 } from '../utils/calc'
+import { fetchProjectData, upsertProjectData } from '../utils/cloudStorage'
+import {
+  isCloudConfigured,
+  getProjectIdFromUrl,
+  buildShareUrl,
+  setProjectIdInUrl,
+} from '../utils/projectSync'
 
 function createDefaultProcesses() {
   const schedule = buildProcessSchedule(PROJECT_START_DATE, PROCESS_NAMES, PROCESS_WORKDAYS)
@@ -102,8 +109,18 @@ function createDefaultState() {
 
 const state = reactive(createDefaultState())
 
-function persist() {
-  saveData({
+const syncMeta = reactive({
+  projectId: getProjectIdFromUrl() || '',
+  cloudReady: isCloudConfigured(),
+  syncing: false,
+  syncError: '',
+  initialized: false,
+})
+
+let cloudSaveTimer = null
+
+function serializeState() {
+  return {
     scheduleVersion: SCHEDULE_VERSION,
     house: { ...state.house },
     processes: state.processes.map((p) => ({ ...p })),
@@ -111,24 +128,76 @@ function persist() {
     acceptances: state.acceptances.map((a) => ({ ...a, images: [...a.images] })),
     budgets: state.budgets.map((b) => ({ ...b })),
     lastWarningRefreshDate: state.lastWarningRefreshDate,
-  })
+  }
 }
 
-function initStore() {
-  const saved = loadData()
-  if (saved) {
-    Object.assign(state.house, saved.house || { area: '', address: '' })
-    state.processes = saved.processes || createDefaultProcesses()
-    if (!saved.scheduleVersion || saved.scheduleVersion < SCHEDULE_VERSION) {
-      state.processes = applyScheduleToProcesses(state.processes)
-    }
-    state.materials = refreshAllMaterials(saved.materials || createDefaultMaterials(), state.processes)
-    state.acceptances = saved.acceptances || []
-    state.budgets = saved.budgets?.length ? saved.budgets : createDefaultBudgets()
-    state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
+function applySavedData(saved) {
+  if (!saved) return
+  Object.assign(state.house, saved.house || { area: '', address: '' })
+  state.processes = saved.processes || createDefaultProcesses()
+  if (!saved.scheduleVersion || saved.scheduleVersion < SCHEDULE_VERSION) {
+    state.processes = applyScheduleToProcesses(state.processes)
   }
+  state.materials = refreshAllMaterials(saved.materials || createDefaultMaterials(), state.processes)
+  state.acceptances = saved.acceptances || []
+  state.budgets = saved.budgets?.length ? saved.budgets : createDefaultBudgets()
+  state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
   ensureDefaultBudgets(state.budgets)
+}
+
+function persistLocal() {
+  saveData(serializeState())
+}
+
+async function persistCloudNow() {
+  if (!syncMeta.projectId || !syncMeta.cloudReady) return
+  syncMeta.syncing = true
+  syncMeta.syncError = ''
+  try {
+    await upsertProjectData(syncMeta.projectId, serializeState())
+  } catch (error) {
+    syncMeta.syncError = error.message || '云端保存失败'
+  } finally {
+    syncMeta.syncing = false
+  }
+}
+
+function persist() {
+  persistLocal()
+  if (!syncMeta.projectId || !syncMeta.cloudReady) return
+  clearTimeout(cloudSaveTimer)
+  cloudSaveTimer = setTimeout(() => {
+    persistCloudNow()
+  }, 600)
+}
+
+async function initStore() {
+  syncMeta.cloudReady = isCloudConfigured()
+  syncMeta.projectId = getProjectIdFromUrl() || syncMeta.projectId
+
+  if (syncMeta.projectId && syncMeta.cloudReady) {
+    syncMeta.syncing = true
+    try {
+      const remote = await fetchProjectData(syncMeta.projectId)
+      if (remote) {
+        applySavedData(remote)
+      } else {
+        applySavedData(loadData())
+        await persistCloudNow()
+      }
+      setProjectIdInUrl(syncMeta.projectId)
+    } catch (error) {
+      syncMeta.syncError = error.message || '云端加载失败，已使用本地数据'
+      applySavedData(loadData())
+    } finally {
+      syncMeta.syncing = false
+    }
+  } else {
+    applySavedData(loadData())
+  }
+
   refreshWarningsIfNeeded()
+  syncMeta.initialized = true
 }
 
 function refreshWarningsIfNeeded() {
@@ -157,6 +226,37 @@ export function useAppStore() {
   const progress = computed(() => calcProgress(state.processes))
   const budgetSummary = computed(() => calcBudgetSummary(state.budgets))
   const materialStats = computed(() => calcMaterialStats(state.materials))
+  const shareLink = computed(() => (syncMeta.projectId ? buildShareUrl(syncMeta.projectId) : ''))
+
+  async function createCloudProject() {
+    if (!syncMeta.cloudReady) {
+      throw new Error('未配置云端数据库，请先按 README 配置 Supabase')
+    }
+    syncMeta.projectId = crypto.randomUUID()
+    setProjectIdInUrl(syncMeta.projectId)
+    await persistCloudNow()
+  }
+
+  async function openCloudProject(projectId) {
+    if (!syncMeta.cloudReady) {
+      throw new Error('未配置云端数据库，请先按 README 配置 Supabase')
+    }
+    syncMeta.projectId = projectId
+    setProjectIdInUrl(projectId)
+    syncMeta.syncing = true
+    syncMeta.syncError = ''
+    try {
+      const remote = await fetchProjectData(projectId)
+      if (remote) {
+        applySavedData(remote)
+      } else {
+        await persistCloudNow()
+      }
+    } finally {
+      syncMeta.syncing = false
+    }
+    refreshWarningsIfNeeded()
+  }
 
   function updateHouse(data) {
     state.house.area = data.area
@@ -240,11 +340,15 @@ export function useAppStore() {
 
   return {
     state,
+    syncMeta,
     progress,
     budgetSummary,
     materialStats,
+    shareLink,
     initStore,
     refreshWarningsIfNeeded,
+    createCloudProject,
+    openCloudProject,
     updateHouse,
     updateProcess,
     updateMaterial,

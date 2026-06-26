@@ -11,6 +11,42 @@
       </div>
     </el-card>
 
+    <el-card class="card-block sync-card" shadow="never">
+      <div class="sync-head">
+        <h3 class="sync-title">云端共享</h3>
+        <el-tag v-if="syncMeta.cloudReady && syncMeta.projectId" type="success" size="small">已连接云端</el-tag>
+        <el-tag v-else-if="syncMeta.cloudReady" type="warning" size="small">云端可用 · 未创建链接</el-tag>
+        <el-tag v-else type="info" size="small">仅本地模式</el-tag>
+      </div>
+
+      <p v-if="!syncMeta.cloudReady" class="sync-tip">
+        管理员尚未配置 Supabase，当前数据仅保存在本机浏览器。请按 README 完成数据库配置后重新部署。
+      </p>
+
+      <template v-else>
+        <p class="sync-tip">创建分享链接后，任何人打开同一链接都能看到并同步最新数据。</p>
+
+        <div v-if="syncMeta.projectId" class="share-box">
+          <el-input :model-value="shareLink" readonly>
+            <template #append>
+              <el-button @click="copyShareLink">复制链接</el-button>
+            </template>
+          </el-input>
+          <p v-if="syncMeta.syncing" class="sync-status">正在同步到云端...</p>
+          <p v-if="syncMeta.syncError" class="sync-error">{{ syncMeta.syncError }}</p>
+        </div>
+
+        <div class="sync-actions">
+          <el-button type="primary" round @click="handleCreateCloud">创建云端项目链接</el-button>
+        </div>
+
+        <div class="open-box">
+          <el-input v-model="openLinkInput" placeholder="粘贴分享链接或项目 ID" />
+          <el-button type="primary" plain @click="handleOpenCloud">打开分享链接</el-button>
+        </div>
+      </template>
+    </el-card>
+
     <div class="stat-cards">
       <el-card class="card-block" shadow="never">
         <div class="card-label">整体进度</div>
@@ -72,14 +108,28 @@
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { Calendar, Box, DocumentChecked, Wallet } from '@element-plus/icons-vue'
+import { ElMessage } from 'element-plus'
 import { ROUTES } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
+import { parseProjectIdFromInput } from '../utils/projectSync'
 
 const router = useRouter()
-const { state, progress, budgetSummary, materialStats, refreshWarningsIfNeeded, updateHouse } = useAppStore()
+const {
+  state,
+  syncMeta,
+  progress,
+  budgetSummary,
+  materialStats,
+  shareLink,
+  refreshWarningsIfNeeded,
+  updateHouse,
+  createCloudProject,
+  openCloudProject,
+} = useAppStore()
 
 const houseDialogVisible = ref(false)
 const houseForm = reactive({ area: '', address: '' })
+const openLinkInput = ref('')
 
 const navItems = [
   { label: '工序进度', path: ROUTES.PROCESS, icon: Calendar },
@@ -106,4 +156,97 @@ function submitHouse() {
 function formatMoney(val) {
   return Number(val || 0).toFixed(2)
 }
+
+async function handleCreateCloud() {
+  try {
+    await createCloudProject()
+    ElMessage.success('云端项目已创建，请复制链接分享给家人')
+  } catch (error) {
+    ElMessage.error(error.message || '创建失败')
+  }
+}
+
+async function handleOpenCloud() {
+  const projectId = parseProjectIdFromInput(openLinkInput.value)
+  if (!projectId) {
+    ElMessage.warning('请粘贴有效的分享链接或项目 ID')
+    return
+  }
+  try {
+    await openCloudProject(projectId)
+    ElMessage.success('已加载云端项目数据')
+  } catch (error) {
+    ElMessage.error(error.message || '打开失败')
+  }
+}
+
+async function copyShareLink() {
+  if (!shareLink.value) return
+  try {
+    await navigator.clipboard.writeText(shareLink.value)
+    ElMessage.success('链接已复制')
+  } catch {
+    ElMessage.warning('复制失败，请手动复制链接')
+  }
+}
 </script>
+
+<style scoped>
+.sync-card {
+  margin-bottom: 16px;
+}
+
+.sync-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.sync-title {
+  margin: 0;
+  font-size: 16px;
+}
+
+.sync-tip {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.6;
+}
+
+.share-box,
+.open-box {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.sync-actions {
+  margin-bottom: 12px;
+}
+
+.sync-status {
+  margin: 0;
+  font-size: 12px;
+  color: #409EFF;
+}
+
+.sync-error {
+  margin: 0;
+  font-size: 12px;
+  color: #F56C6C;
+}
+
+@media (min-width: 640px) {
+  .open-box {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .open-box .el-input {
+    flex: 1;
+  }
+}
+</style>
