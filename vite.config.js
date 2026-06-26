@@ -1,8 +1,11 @@
 import { defineConfig } from 'vite'
 import vue from '@vitejs/plugin-vue'
 
-// https://vite.dev/config/
+// GitHub Pages 项目站地址：https://wendycao-666.github.io/-/
+const base = process.env.GITHUB_PAGES === 'true' ? '/-/' : '/'
+
 export default defineConfig({
+  base,
   plugins: [vue()],
   server: {
     host: true,
