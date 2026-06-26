@@ -124,10 +124,10 @@ function initStore() {
     }
     state.materials = refreshAllMaterials(saved.materials || createDefaultMaterials(), state.processes)
     state.acceptances = saved.acceptances || []
-    state.budgets = saved.budgets || createDefaultBudgets()
-    ensureDefaultBudgets(state.budgets)
+    state.budgets = saved.budgets?.length ? saved.budgets : createDefaultBudgets()
     state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
   }
+  ensureDefaultBudgets(state.budgets)
   refreshWarningsIfNeeded()
 }
 
