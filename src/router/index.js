@@ -7,7 +7,7 @@ import Acceptance from '../views/Acceptance.vue'
 import Budget from '../views/Budget.vue'
 
 const router = createRouter({
-  history: createWebHistory(),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     { path: ROUTES.HOME, name: 'Home', component: Home },
     { path: ROUTES.PROCESS, name: 'Process', component: Process },
