@@ -20,31 +20,28 @@
       </div>
 
       <p v-if="!syncMeta.cloudReady" class="sync-tip">
-        管理员尚未配置 Supabase，当前数据仅保存在本机浏览器。请按 README 完成数据库配置后重新部署。
+        当前为本地模式。配置 Supabase 并重新部署后，可通过链接与家人共享同一份数据（详见 README）。
       </p>
+      <p v-else class="sync-tip">创建分享链接后，任何人打开同一链接都能看到并同步最新数据。</p>
 
-      <template v-else>
-        <p class="sync-tip">创建分享链接后，任何人打开同一链接都能看到并同步最新数据。</p>
+      <div v-if="syncMeta.projectId && syncMeta.cloudReady" class="share-box">
+        <el-input :model-value="shareLink" readonly>
+          <template #append>
+            <el-button @click="copyShareLink">复制链接</el-button>
+          </template>
+        </el-input>
+        <p v-if="syncMeta.syncing" class="sync-status">正在同步到云端...</p>
+        <p v-if="syncMeta.syncError" class="sync-error">{{ syncMeta.syncError }}</p>
+      </div>
 
-        <div v-if="syncMeta.projectId" class="share-box">
-          <el-input :model-value="shareLink" readonly>
-            <template #append>
-              <el-button @click="copyShareLink">复制链接</el-button>
-            </template>
-          </el-input>
-          <p v-if="syncMeta.syncing" class="sync-status">正在同步到云端...</p>
-          <p v-if="syncMeta.syncError" class="sync-error">{{ syncMeta.syncError }}</p>
-        </div>
+      <div class="sync-actions">
+        <el-button type="primary" round @click="handleCreateCloud">创建云端项目链接</el-button>
+      </div>
 
-        <div class="sync-actions">
-          <el-button type="primary" round @click="handleCreateCloud">创建云端项目链接</el-button>
-        </div>
-
-        <div class="open-box">
-          <el-input v-model="openLinkInput" placeholder="粘贴分享链接或项目 ID" />
-          <el-button type="primary" plain @click="handleOpenCloud">打开分享链接</el-button>
-        </div>
-      </template>
+      <div class="open-box">
+        <el-input v-model="openLinkInput" placeholder="粘贴分享链接或项目 ID" />
+        <el-button type="primary" plain @click="handleOpenCloud">打开分享链接</el-button>
+      </div>
     </el-card>
 
     <div class="stat-cards">
