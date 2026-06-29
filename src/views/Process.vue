@@ -13,12 +13,14 @@
           <div class="gantt-axis">
             <span
               v-for="tick in timelineTicks"
-              :key="tick.date"
+              :key="tick.id"
               class="axis-tick"
+              :class="[`axis-tick-${tick.align}`, tick.row ? `axis-tick-row-${tick.row}` : '']"
               :style="{ left: `${tick.left}%` }"
-              :title="tick.date"
+              :title="`${tick.name} · ${tick.date}`"
             >
-              {{ tick.label }}
+              <span class="axis-tick-date">{{ tick.label }}</span>
+              <span class="axis-tick-name">{{ tick.shortName }}</span>
             </span>
             <span
               v-if="todayMarker.visible"
@@ -35,14 +37,20 @@
       <p v-if="!todayMarker.visible && todayMarker.hint" class="gantt-today-hint">{{ todayMarker.hint }}</p>
 
       <div v-for="group in ganttGroups" :key="group.id" class="gantt-group">
-        <div class="gantt-row gantt-row-parent" @click="toggleGroup(group.id)">
+        <div class="gantt-row gantt-row-parent" :class="{ 'is-selected': selectedItemId === group.id }">
           <span class="gantt-name">
-            <el-icon class="gantt-arrow" :class="{ expanded: expandedGroups[group.id] }">
+            <el-icon
+              class="gantt-arrow"
+              :class="{ expanded: expandedGroups[group.id] }"
+              @click.stop="toggleGroup(group.id)"
+            >
               <ArrowRight />
             </el-icon>
-            {{ group.name }}
+            <span class="gantt-name-main" @click="selectItem(group.id)">
+              <span class="gantt-name-text">{{ group.name }}</span>
+            </span>
           </span>
-          <div class="gantt-track">
+          <div class="gantt-track" @click="selectItem(group.id)">
             <div
               v-for="tick in timelineTicks"
               :key="`${group.id}-grid-${tick.date}`"
@@ -50,18 +58,31 @@
               :style="{ left: `${tick.left}%` }"
             />
             <div v-if="todayMarker.visible" class="gantt-today-line" :style="{ left: todayMarker.left }" />
+            <span
+              v-if="selectedItemId === group.id"
+              class="gantt-duration-label"
+              :style="group.durationLabelStyle"
+            >
+              {{ group.labelText }}
+            </span>
             <div
               class="gantt-bar"
-              :class="group.acceptanceStatus === ACCEPTANCE_STATUS.DONE ? 'bar-done' : 'bar-pending'"
-              :style="group.barStyle"
-              :title="group.dateRange"
+              :class="{ 'bar-selected': selectedItemId === group.id }"
+              :style="{ ...group.barStyle, background: group.barColor, color: group.colors.main }"
             />
           </div>
         </div>
         <div v-show="expandedGroups[group.id]" class="gantt-children">
-          <div v-for="sub in group.subtasks" :key="sub.id" class="gantt-row gantt-row-child">
-            <span class="gantt-name gantt-name-sub">{{ sub.name }}</span>
-            <div class="gantt-track">
+          <div
+            v-for="sub in group.subtasks"
+            :key="sub.id"
+            class="gantt-row gantt-row-child"
+            :class="{ 'is-selected': selectedItemId === sub.id }"
+          >
+            <span class="gantt-name gantt-name-sub" @click="selectItem(sub.id)">
+              <span class="gantt-name-text">{{ sub.name }}</span>
+            </span>
+            <div class="gantt-track" @click="selectItem(sub.id)">
               <div
                 v-for="tick in timelineTicks"
                 :key="`${sub.id}-grid-${tick.date}`"
@@ -69,11 +90,17 @@
                 :style="{ left: `${tick.left}%` }"
               />
               <div v-if="todayMarker.visible" class="gantt-today-line" :style="{ left: todayMarker.left }" />
+              <span
+                v-if="selectedItemId === sub.id"
+                class="gantt-duration-label gantt-duration-label-sub"
+                :style="sub.durationLabelStyle"
+              >
+                {{ sub.labelText }}
+              </span>
               <div
                 class="gantt-bar gantt-bar-sub"
-                :class="group.acceptanceStatus === ACCEPTANCE_STATUS.DONE ? 'bar-done' : 'bar-pending'"
-                :style="sub.barStyle"
-                :title="sub.dateRange"
+                :class="{ 'bar-selected': selectedItemId === sub.id }"
+                :style="{ ...sub.barStyle, background: sub.barColor, color: group.colors.main }"
               />
             </div>
           </div>
@@ -153,10 +180,11 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowRight } from '@element-plus/icons-vue'
-import { ACCEPTANCE_STATUS, PROCESS_SUBTASKS } from '../constants'
+import { ACCEPTANCE_STATUS, PROCESS_SUBTASKS, PROCESS_GANTT_COLORS } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
 import { buildSubtaskSchedule } from '../utils/workday'
-import { todayStr, formatDate } from '../utils/date'
+import { calcConstructionDays } from '../utils/calc'
+import { todayStr } from '../utils/date'
 import AcceptanceSection from '../components/AcceptanceSection.vue'
 
 const route = useRoute()
@@ -209,8 +237,35 @@ function buildDefaultExpandedGroups() {
 
 const expandedGroups = reactive(buildDefaultExpandedGroups())
 
+const selectedItemId = ref(findCurrentProcessId(state.processes) || state.processes[0]?.id || '')
+
 function toggleGroup(id) {
   expandedGroups[id] = !expandedGroups[id]
+}
+
+function selectItem(id) {
+  selectedItemId.value = id
+}
+
+function buildDurationMeta(startDate, endDate) {
+  const days = calcConstructionDays(startDate, endDate)
+  return {
+    days,
+    labelText: `${days}天  ${startDate} ~ ${endDate}`,
+  }
+}
+
+function getProcessColors(processName) {
+  return PROCESS_GANTT_COLORS[processName] || { main: '#409EFF', light: '#a0cfff' }
+}
+
+function buildDurationLabelStyle(barStyle, colors) {
+  return {
+    left: barStyle.left,
+    borderColor: colors.main,
+    background: `${colors.main}18`,
+    color: colors.main,
+  }
 }
 
 const timeline = computed(() => {
@@ -229,25 +284,51 @@ function calcTimelinePercent(dateStr) {
   return ((new Date(dateStr) - new Date(min)) / total) * 100
 }
 
-function buildTimelineTicks(min, max, tickCount = 6) {
+const PROCESS_AXIS_LABELS = {
+  拆改工程: '拆改',
+  水电改造: '水电',
+  泥瓦工程: '泥瓦',
+  木作工程: '木作',
+  油漆工程: '油漆',
+  安装阶段: '安装',
+  开荒保洁: '保洁',
+}
+
+function buildMilestoneTicks(processes, min, max) {
+  if (!min || !max || !processes.length) return []
   const start = new Date(min).getTime()
-  const end = new Date(max).getTime()
-  if (!min || !max) return []
-  if (start >= end) {
-    return [{ date: min, label: formatTickLabel(min), left: 0 }]
+  const total = new Date(max).getTime() - start || 1
+  const MIN_LABEL_GAP = 8
+
+  const ticks = processes.map((process) => ({
+    id: process.id,
+    name: process.name,
+    date: process.startDate,
+    label: formatTickLabel(process.startDate),
+    shortName: PROCESS_AXIS_LABELS[process.name] || process.name,
+    left: ((new Date(process.startDate).getTime() - start) / total) * 100,
+    align: 'center',
+    row: 0,
+  }))
+
+  ticks[0].align = 'start'
+  ticks[0].row = 0
+
+  for (let i = 1; i < ticks.length; i += 1) {
+    const gap = ticks[i].left - ticks[i - 1].left
+    const isLast = i === ticks.length - 1
+
+    if (gap < MIN_LABEL_GAP) {
+      ticks[i - 1].align = 'start'
+      ticks[i - 1].row = 1
+      ticks[i].row = 0
+      ticks[i].align = isLast ? 'end' : 'start'
+    } else {
+      ticks[i].row = 0
+      ticks[i].align = isLast ? 'end' : 'center'
+    }
   }
 
-  const ticks = []
-  for (let i = 0; i < tickCount; i += 1) {
-    const ratio = i / (tickCount - 1)
-    const time = start + (end - start) * ratio
-    const date = formatDate(new Date(time))
-    ticks.push({
-      date,
-      label: formatTickLabel(date),
-      left: ratio * 100,
-    })
-  }
   return ticks
 }
 
@@ -256,7 +337,9 @@ function formatTickLabel(dateStr) {
   return `${month}/${day}`
 }
 
-const timelineTicks = computed(() => buildTimelineTicks(timeline.value.min, timeline.value.max))
+const timelineTicks = computed(() =>
+  buildMilestoneTicks(state.processes, timeline.value.min, timeline.value.max)
+)
 
 const todayMarker = computed(() => {
   const { min, max } = timeline.value
@@ -292,18 +375,37 @@ const ganttGroups = computed(() =>
   state.processes.map((process) => {
     const subtaskDefs = PROCESS_SUBTASKS[process.name] || []
     const scheduled = buildSubtaskSchedule(process.startDate, subtaskDefs)
+    const colors = getProcessColors(process.name)
+    const parentDuration = buildDurationMeta(process.startDate, process.endDate)
+    const isDone = process.acceptanceStatus === ACCEPTANCE_STATUS.DONE
+    const barStyle = calcBarStyle(process.startDate, process.endDate)
     return {
       id: process.id,
       name: process.name,
       acceptanceStatus: process.acceptanceStatus,
-      dateRange: `${process.startDate} ~ ${process.endDate}`,
-      barStyle: calcBarStyle(process.startDate, process.endDate),
-      subtasks: scheduled.map((sub, index) => ({
-        id: `${process.id}-${index}`,
-        name: sub.name,
-        dateRange: `${sub.startDate} ~ ${sub.endDate}`,
-        barStyle: calcBarStyle(sub.startDate, sub.endDate),
-      })),
+      colors,
+      startDate: process.startDate,
+      endDate: process.endDate,
+      days: parentDuration.days,
+      labelText: parentDuration.labelText,
+      durationLabelStyle: buildDurationLabelStyle(barStyle, colors),
+      barColor: isDone ? colors.main : colors.light,
+      barStyle,
+      subtasks: scheduled.map((sub, index) => {
+        const subDuration = buildDurationMeta(sub.startDate, sub.endDate)
+        const subBarStyle = calcBarStyle(sub.startDate, sub.endDate)
+        return {
+          id: `${process.id}-${index}`,
+          name: sub.name,
+          startDate: sub.startDate,
+          endDate: sub.endDate,
+          days: subDuration.days,
+          labelText: subDuration.labelText,
+          durationLabelStyle: buildDurationLabelStyle(subBarStyle, colors),
+          barColor: colors.light,
+          barStyle: subBarStyle,
+        }
+      }),
     }
   })
 )
@@ -361,8 +463,8 @@ function onStatusChange(id, val) {
 .gantt-header,
 .gantt-row {
   display: grid;
-  grid-template-columns: 108px 1fr;
-  gap: 8px;
+  grid-template-columns: 152px 1fr;
+  gap: 10px;
   align-items: center;
   margin-bottom: 8px;
   font-size: 13px;
@@ -381,16 +483,40 @@ function onStatusChange(id, val) {
 }
 .gantt-axis {
   position: relative;
-  height: 36px;
+  height: 48px;
   border-bottom: 1px solid #dcdfe6;
 }
 .axis-tick {
   position: absolute;
-  bottom: 6px;
-  transform: translateX(-50%);
-  font-size: 11px;
-  color: #909399;
+  bottom: 2px;
+  display: flex;
+  flex-direction: row;
+  align-items: baseline;
+  gap: 3px;
   white-space: nowrap;
+}
+.axis-tick-row-1 {
+  bottom: 22px;
+}
+.axis-tick-date {
+  font-size: 11px;
+  font-weight: 600;
+  color: #606266;
+  line-height: 1.15;
+}
+.axis-tick-name {
+  font-size: 10px;
+  color: #909399;
+  line-height: 1.15;
+}
+.axis-tick-start {
+  transform: translateX(0);
+}
+.axis-tick-center {
+  transform: translateX(-50%);
+}
+.axis-tick-end {
+  transform: translateX(-100%);
 }
 .axis-today {
   position: absolute;
@@ -402,7 +528,7 @@ function onStatusChange(id, val) {
   white-space: nowrap;
 }
 .gantt-today-hint {
-  margin: 0 0 10px 116px;
+  margin: 0 0 10px 162px;
   font-size: 12px;
   color: #E6A23C;
 }
@@ -410,17 +536,41 @@ function onStatusChange(id, val) {
   margin-bottom: 4px;
 }
 .gantt-row-parent {
-  cursor: pointer;
   user-select: none;
 }
-.gantt-row-parent:hover .gantt-name {
+.gantt-row-parent.is-selected,
+.gantt-row-child.is-selected {
+  background: #fafcff;
+  border-radius: 6px;
+  padding: 22px 0 4px;
+}
+.gantt-name-main,
+.gantt-name-sub,
+.gantt-track {
+  cursor: pointer;
+}
+.gantt-name-main:hover .gantt-name-text,
+.gantt-name-sub:hover .gantt-name-text {
   color: #409EFF;
 }
 .gantt-name {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 4px;
   line-height: 1.3;
+  min-width: 0;
+}
+.gantt-name-main,
+.gantt-name-sub {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+.gantt-name-text {
+  line-height: 1.3;
+  font-weight: 500;
 }
 .gantt-name-sub {
   padding-left: 18px;
@@ -429,8 +579,13 @@ function onStatusChange(id, val) {
 }
 .gantt-arrow {
   flex-shrink: 0;
+  margin-top: 1px;
+  cursor: pointer;
   transition: transform 0.2s;
   color: #909399;
+}
+.gantt-arrow:hover {
+  color: #409EFF;
 }
 .gantt-arrow.expanded {
   transform: rotate(90deg);
@@ -443,10 +598,10 @@ function onStatusChange(id, val) {
 }
 .gantt-track {
   position: relative;
-  height: 18px;
+  height: 22px;
   background: #f2f6fc;
   border-radius: 4px;
-  overflow: hidden;
+  overflow: visible;
 }
 .gantt-grid-line {
   position: absolute;
@@ -469,25 +624,42 @@ function onStatusChange(id, val) {
   opacity: 0.85;
 }
 .gantt-row-child .gantt-track {
-  height: 14px;
+  height: 18px;
 }
 .gantt-bar {
   position: absolute;
-  top: 2px;
-  height: 14px;
+  top: 3px;
+  height: 16px;
   border-radius: 4px;
   z-index: 1;
 }
 .gantt-bar-sub {
-  top: 1px;
-  height: 12px;
-  opacity: 0.85;
+  top: 2px;
+  height: 14px;
+  opacity: 0.92;
 }
-.bar-done {
-  background: #409EFF;
+.gantt-bar.bar-selected {
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px currentColor;
+  z-index: 2;
 }
-.bar-pending {
-  background: #a0cfff;
+.gantt-duration-label {
+  position: absolute;
+  top: -24px;
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  padding: 5px 10px;
+  border-left: 3px solid;
+  border-radius: 4px;
+  z-index: 4;
+  pointer-events: none;
+  transform: translateX(0);
+}
+.gantt-duration-label-sub {
+  top: -22px;
+  font-size: 11px;
+  padding: 4px 8px;
 }
 .process-card {
   margin-bottom: 12px;
@@ -529,10 +701,16 @@ function onStatusChange(id, val) {
   .gantt-inner {
     min-width: 520px;
   }
+  .axis-tick-date {
+    font-size: 10px;
+  }
+  .axis-tick-name {
+    font-size: 9px;
+  }
   .gantt-header,
   .gantt-row {
-    grid-template-columns: 72px 1fr;
-    gap: 6px;
+    grid-template-columns: 108px 1fr;
+    gap: 8px;
   }
   .gantt-name {
     font-size: 12px;
@@ -541,8 +719,12 @@ function onStatusChange(id, val) {
     padding-left: 14px;
     font-size: 11px;
   }
+  .gantt-duration-label {
+    font-size: 11px;
+    padding: 4px 8px;
+  }
   .gantt-today-hint {
-    margin-left: 78px;
+    margin-left: 116px;
     font-size: 11px;
   }
   .process-head {

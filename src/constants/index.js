@@ -1,13 +1,13 @@
 export const STORAGE_KEY = 'decoration_tool_data'
 
 /** 排期版本：变更后自动刷新工序默认日期 */
-export const SCHEDULE_VERSION = 1
+export const SCHEDULE_VERSION = 2
 
 /** 数据结构版本：升级后自动补全采购等字段并写回本地/云端 */
 export const DATA_VERSION = 2
 
 /** 计划开工日 */
-export const PROJECT_START_DATE = '2026-07-06'
+export const PROJECT_START_DATE = '2026-07-13'
 
 /** 各工序施工工作日（不含周末与法定节假日） */
 export const PROCESS_WORKDAYS = {
@@ -37,6 +37,17 @@ export const PROCESS_NAMES = [
   '安装阶段',
   '开荒保洁',
 ]
+
+/** 甘特图工序配色（一级深色、二级浅色） */
+export const PROCESS_GANTT_COLORS = {
+  拆改工程: { main: '#409EFF', light: '#79bbff' },
+  水电改造: { main: '#67C23A', light: '#95d475' },
+  泥瓦工程: { main: '#E6A23C', light: '#eebe77' },
+  木作工程: { main: '#9C27B0', light: '#CE93D8' },
+  油漆工程: { main: '#F56C6C', light: '#fab6b6' },
+  安装阶段: { main: '#00BCD4', light: '#80deea' },
+  开荒保洁: { main: '#909399', light: '#c8c9cc' },
+}
 
 /** 工序子项（甘特图二级展示，工作日之和等于对应工序） */
 export const PROCESS_SUBTASKS = {
