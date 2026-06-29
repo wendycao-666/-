@@ -118,6 +118,10 @@
 
     </section>
 
+    <section class="mine-section">
+      <CloudSyncSection />
+    </section>
+
     <el-dialog
       v-model="dialogVisible"
       :title="editingId ? '编辑预算' : '新增预算'"
@@ -197,6 +201,7 @@ import { calcBudgetItemTotal, calcBudgetCategoryStats, calcBudgetItemVariance, c
 import { getProcurementBudgetSource } from '../utils/materialBudgetSync'
 import { useAppStore } from '../composables/useAppStore'
 import ImportantMattersSection from '../components/ImportantMattersSection.vue'
+import CloudSyncSection from '../components/CloudSyncSection.vue'
 import EmptyState from '../components/EmptyState.vue'
 import BudgetPieChart from '../components/BudgetPieChart.vue'
 

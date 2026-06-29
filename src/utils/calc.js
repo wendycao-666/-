@@ -82,6 +82,85 @@ export function calcProgress(processes) {
   }
 }
 
+export function getCurrentProcessInfo(processes, today = todayStr()) {
+  if (!processes.length) {
+    return {
+      phase: 'pending',
+      phaseLabel: '待开工',
+      tagType: 'info',
+      process: null,
+      processName: '-',
+      dateRange: '',
+      days: 0,
+      hint: '暂无工序数据',
+    }
+  }
+
+  const sorted = [...processes].sort((a, b) => a.startDate.localeCompare(b.startDate))
+  const first = sorted[0]
+  const last = sorted[sorted.length - 1]
+  const inProgress = sorted.find(
+    (process) => process.startDate && process.endDate && today >= process.startDate && today <= process.endDate
+  )
+
+  if (inProgress) {
+    const days = calcConstructionDays(inProgress.startDate, inProgress.endDate)
+    const accepted = inProgress.acceptanceStatus === ACCEPTANCE_STATUS.DONE
+    return {
+      phase: 'active',
+      phaseLabel: accepted ? '当前阶段已验收' : '进行中',
+      tagType: accepted ? 'success' : 'primary',
+      process: inProgress,
+      processName: inProgress.name,
+      dateRange: `${inProgress.startDate} ~ ${inProgress.endDate}`,
+      days,
+      hint: `今天 ${today}，当前处于 ${inProgress.name}`,
+    }
+  }
+
+  if (today < first.startDate) {
+    const days = calcConstructionDays(first.startDate, first.endDate)
+    return {
+      phase: 'pending',
+      phaseLabel: '待开工',
+      tagType: 'warning',
+      process: first,
+      processName: first.name,
+      dateRange: `${first.startDate} ~ ${first.endDate}`,
+      days,
+      hint: `今天 ${today}，首期工序 ${first.startDate} 开工`,
+    }
+  }
+
+  if (today > last.endDate) {
+    const days = calcConstructionDays(last.startDate, last.endDate)
+    return {
+      phase: 'finished',
+      phaseLabel: '已全部结束',
+      tagType: 'success',
+      process: last,
+      processName: last.name,
+      dateRange: `${last.startDate} ~ ${last.endDate}`,
+      days,
+      hint: `今天 ${today}，全部工序已于 ${last.endDate} 结束`,
+    }
+  }
+
+  const upcoming = sorted.find((process) => process.startDate > today)
+  const nextProcess = upcoming || last
+  const days = calcConstructionDays(nextProcess.startDate, nextProcess.endDate)
+  return {
+    phase: 'upcoming',
+    phaseLabel: '即将开始',
+    tagType: 'info',
+    process: nextProcess,
+    processName: nextProcess.name,
+    dateRange: `${nextProcess.startDate} ~ ${nextProcess.endDate}`,
+    days,
+    hint: `今天 ${today}，下一道工序 ${nextProcess.name} ${nextProcess.startDate} 开工`,
+  }
+}
+
 export function calcMaterialStats(materials) {
   let overdue = 0
   let expiring = 0

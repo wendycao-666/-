@@ -123,15 +123,17 @@ body {
   flex-wrap: wrap;
 }
 
-.house-main .page-title {
-  margin-bottom: 8px;
-}
-
-.house-address,
+.house-name,
 .house-area {
   margin: 4px 0;
   font-size: 14px;
   color: #606266;
+}
+
+.house-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #303133;
 }
 
 .el-button {
