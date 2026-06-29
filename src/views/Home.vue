@@ -49,14 +49,23 @@
     </el-card>
 
     <div class="stat-cards">
-      <el-card class="card-block" shadow="never">
+      <el-card
+        class="card-block stat-card-link"
+        shadow="never"
+        @click="router.push(ROUTES.PROCESS)"
+      >
         <div class="card-label">整体进度</div>
         <div class="card-value primary">{{ progress.percent }}%</div>
         <el-progress :percentage="progress.percent" :stroke-width="10" :show-text="false" />
         <div class="card-sub">已验收 {{ progress.doneCount }} / {{ progress.totalCount }} 道工序</div>
       </el-card>
 
-      <el-card class="card-block" :class="{ 'risk-card': materialStats.overdue > 0 }" shadow="never">
+      <el-card
+        class="card-block stat-card-link"
+        :class="{ 'risk-card': materialStats.overdue > 0 }"
+        shadow="never"
+        @click="router.push({ path: ROUTES.PROCUREMENT, query: { tab: 'material' } })"
+      >
         <div class="card-label">主材预警</div>
         <div class="card-row">
           <span class="danger">逾期 {{ materialStats.overdue }}</span>
@@ -65,26 +74,29 @@
         </div>
       </el-card>
 
-      <el-card class="card-block" :class="{ 'risk-card': budgetSummary.isOverBudget }" shadow="never">
+      <el-card
+        class="card-block stat-card-link"
+        :class="{ 'risk-card': pendingTodoCount > 0 }"
+        shadow="never"
+        @click="router.push(ROUTES.TODO)"
+      >
+        <div class="card-label">整改待办</div>
+        <div class="card-value" :class="{ danger: pendingTodoCount > 0 }">{{ pendingTodoCount }}</div>
+        <div class="card-sub">验收不合格项待处理</div>
+      </el-card>
+
+      <el-card
+        class="card-block stat-card-link"
+        :class="{ 'risk-card': budgetSummary.isOverBudget }"
+        shadow="never"
+        @click="router.push(ROUTES.BUDGET)"
+      >
         <div class="card-label">预算概况</div>
         <div class="card-value">¥ {{ formatMoney(budgetSummary.totalBudget) }}</div>
         <div class="card-sub">
-          已支出 ¥ {{ formatMoney(budgetSummary.totalPaid) }} · 剩余 ¥ {{ formatMoney(budgetSummary.remaining) }}
+          实际 ¥ {{ formatMoney(budgetSummary.totalActual) }} · 已支付 ¥ {{ formatMoney(budgetSummary.totalPaid) }}
         </div>
-        <div v-if="budgetSummary.isOverBudget" class="over-budget">已超支</div>
-      </el-card>
-    </div>
-
-    <div class="nav-grid">
-      <el-card
-        v-for="item in navItems"
-        :key="item.path"
-        class="card-block nav-item"
-        shadow="never"
-        @click="router.push(item.path)"
-      >
-        <el-icon :size="28" color="#409EFF"><component :is="item.icon" /></el-icon>
-        <span>{{ item.label }}</span>
+        <div v-if="budgetSummary.isOverBudget" class="over-budget">已支付超预算</div>
       </el-card>
     </div>
 
@@ -108,7 +120,6 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { Calendar, Box, DocumentChecked, Wallet } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ROUTES } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
@@ -122,6 +133,7 @@ const {
   budgetSummary,
   materialStats,
   shareLink,
+  pendingTodoCount,
   refreshWarningsIfNeeded,
   updateHouse,
   createCloudProject,
@@ -131,13 +143,6 @@ const {
 const houseDialogVisible = ref(false)
 const houseForm = reactive({ area: '', address: '' })
 const openLinkInput = ref('')
-
-const navItems = [
-  { label: '工序进度', path: ROUTES.PROCESS, icon: Calendar },
-  { label: '主材采购', path: ROUTES.MATERIAL, icon: Box },
-  { label: '验收记录', path: ROUTES.ACCEPTANCE, icon: DocumentChecked },
-  { label: '预算管理', path: ROUTES.BUDGET, icon: Wallet },
-]
 
 onMounted(() => {
   refreshWarningsIfNeeded()
@@ -282,6 +287,26 @@ async function copyShareLink() {
   margin: 0;
   font-size: 12px;
   color: #F56C6C;
+}
+
+.stat-card-link {
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+}
+
+.stat-card-link:hover {
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+@media (max-width: 640px) {
+  .sync-actions .el-button {
+    width: 100%;
+  }
+
+  .open-box .el-button {
+    width: 100%;
+  }
 }
 
 @media (min-width: 640px) {

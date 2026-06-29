@@ -23,20 +23,53 @@ export function calcBudgetItemTotal(unitPrice, quantity) {
   return Number(unitPrice || 0) * Number(quantity || 0)
 }
 
+/** 预算金额或实际费用任一大于 0 时在预算管理页展示 */
+export function isBudgetItemVisible(item) {
+  const budget = calcBudgetItemTotal(item.unitPrice, item.quantity)
+  const actual = Number(item.actualAmount || 0)
+  return budget > 0 || actual > 0
+}
+
 export function calcBudgetSummary(budgets) {
   const totalBudget = budgets.reduce(
     (sum, item) => sum + calcBudgetItemTotal(item.unitPrice, item.quantity),
     0
   )
+  const totalActual = budgets.reduce((sum, item) => sum + Number(item.actualAmount || 0), 0)
   const totalPaid = budgets.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0)
-  const remaining = totalBudget - totalPaid
+  const variance = totalBudget - totalPaid
   return {
     totalBudget,
+    totalActual,
     totalPaid,
-    remaining,
-    unpaid: remaining,
+    variance,
+    remaining: totalBudget - totalPaid,
+    unpaid: totalBudget - totalPaid,
     isOverBudget: totalPaid > totalBudget,
   }
+}
+
+export function calcBudgetItemVariance(item) {
+  const budget = calcBudgetItemTotal(item.unitPrice, item.quantity)
+  const actual = Number(item.actualAmount || 0)
+  const paid = Number(item.paidAmount || 0)
+  return {
+    budget,
+    actual,
+    paid,
+    variance: budget - paid,
+  }
+}
+
+export function calcBudgetCategoryStats(budgets, categories) {
+  return categories
+    .map((category) => ({
+      category,
+      amount: budgets
+        .filter((item) => item.category === category)
+        .reduce((sum, item) => sum + calcBudgetItemTotal(item.unitPrice, item.quantity), 0),
+    }))
+    .filter((item) => item.amount > 0)
 }
 
 export function calcProgress(processes) {

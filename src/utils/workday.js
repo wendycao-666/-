@@ -60,6 +60,17 @@ export function buildProcessSchedule(startDate, processNames, workdayMap) {
   })
 }
 
+/** 在工序起止范围内，按子项工作日串行排期 */
+export function buildSubtaskSchedule(parentStart, subtasks) {
+  let cursor = parentStart
+  return subtasks.map(({ name, workdays }) => {
+    const startDate = nextWorkday(cursor)
+    const endDate = calcEndByWorkdays(startDate, workdays)
+    cursor = addDays(endDate, 1)
+    return { name, startDate, endDate }
+  })
+}
+
 export function todayStrSafe() {
   return formatDate(new Date())
 }

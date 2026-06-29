@@ -27,8 +27,9 @@ import { ROUTES } from './constants'
 const navItems = [
   { label: '首页', path: ROUTES.HOME },
   { label: '工序', path: ROUTES.PROCESS },
-  { label: '主材', path: ROUTES.MATERIAL },
+  { label: '采购', path: ROUTES.PROCUREMENT },
   { label: '验收', path: ROUTES.ACCEPTANCE },
+  { label: '待办', path: ROUTES.TODO },
   { label: '预算', path: ROUTES.BUDGET },
 ]
 </script>
@@ -84,14 +85,37 @@ const navItems = [
 }
 
 @media (max-width: 640px) {
+  .app-header {
+    padding: 12px 12px 0;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .logo {
+    font-size: 16px;
+  }
+
   .app-nav {
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
     gap: 6px;
+    padding: 8px 12px 12px;
+    padding-left: max(12px, env(safe-area-inset-left));
+    padding-right: max(12px, env(safe-area-inset-right));
+  }
+
+  .app-nav::-webkit-scrollbar {
+    display: none;
   }
 
   .nav-tab {
-    min-width: 56px;
-    padding: 7px 12px;
-    font-size: 13px;
+    flex-shrink: 0;
+    min-width: auto;
+    padding: 6px 10px;
+    font-size: 12px;
   }
 }
 </style>

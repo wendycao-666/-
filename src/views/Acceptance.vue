@@ -22,6 +22,9 @@
         </el-tag>
       </div>
       <p v-if="item.comment" class="acceptance-comment">{{ item.comment }}</p>
+      <ul v-if="item.result === ACCEPTANCE_RESULT.FAIL && item.failItems?.length" class="fail-list">
+        <li v-for="(failItem, idx) in item.failItems" :key="idx">{{ failItem }}</li>
+      </ul>
       <div v-if="item.images.length" class="image-list">
         <el-image
           v-for="(img, idx) in item.images"
@@ -54,10 +57,27 @@
           />
         </el-form-item>
         <el-form-item label="验收结果" required>
-          <el-radio-group v-model="form.result">
+          <el-radio-group v-model="form.result" @change="onResultChange">
             <el-radio :label="ACCEPTANCE_RESULT.PASS">合格</el-radio>
             <el-radio :label="ACCEPTANCE_RESULT.FAIL">不合格</el-radio>
           </el-radio-group>
+        </el-form-item>
+        <el-form-item v-if="form.result === ACCEPTANCE_RESULT.FAIL" label="不合格项" required>
+          <div v-for="(_, index) in form.failItems" :key="index" class="fail-item-row">
+            <el-input
+              v-model="form.failItems[index]"
+              placeholder="描述不合格位置或问题"
+            />
+            <el-button
+              v-if="form.failItems.length > 1"
+              link
+              type="danger"
+              @click="removeFailItem(index)"
+            >
+              删除
+            </el-button>
+          </div>
+          <el-button link type="primary" @click="addFailItem">+ 添加不合格项</el-button>
         </el-form-item>
         <el-form-item label="验收评语">
           <el-input v-model="form.comment" type="textarea" :rows="3" placeholder="请输入验收评语" />
@@ -107,7 +127,26 @@ const form = reactive({
   result: ACCEPTANCE_RESULT.PASS,
   comment: '',
   images: [],
+  failItems: [''],
 })
+
+function resetFailItems() {
+  form.failItems = ['']
+}
+
+function addFailItem() {
+  form.failItems.push('')
+}
+
+function removeFailItem(index) {
+  form.failItems.splice(index, 1)
+}
+
+function onResultChange(val) {
+  if (val === ACCEPTANCE_RESULT.FAIL && !form.failItems.length) {
+    resetFailItems()
+  }
+}
 
 function openDialog() {
   form.processName = ''
@@ -115,6 +154,7 @@ function openDialog() {
   form.result = ACCEPTANCE_RESULT.PASS
   form.comment = ''
   form.images = []
+  resetFailItems()
   dialogVisible.value = true
 }
 
@@ -133,15 +173,25 @@ function submit() {
     ElMessage.warning('请完善必填信息')
     return
   }
+
+  const failItems = form.failItems.map((item) => item.trim()).filter(Boolean)
+  if (form.result === ACCEPTANCE_RESULT.FAIL && !failItems.length) {
+    ElMessage.warning('请至少填写一项不合格内容')
+    return
+  }
+
   addAcceptance({
     processName: form.processName,
     date: form.date,
     result: form.result,
     comment: form.comment.trim(),
     images: [...form.images],
+    failItems,
   })
   dialogVisible.value = false
-  ElMessage.success('验收记录已添加')
+  ElMessage.success(
+    form.result === ACCEPTANCE_RESULT.FAIL ? '验收记录已添加，不合格项已加入待办' : '验收记录已添加'
+  )
 }
 
 function remove(id) {
@@ -186,6 +236,24 @@ function remove(id) {
   font-size: 14px;
   color: #606266;
 }
+.fail-list {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #F56C6C;
+  font-size: 14px;
+}
+.fail-list li {
+  margin-bottom: 4px;
+}
+.fail-item-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.fail-item-row .el-input {
+  flex: 1;
+}
 .image-list {
   display: flex;
   flex-wrap: wrap;
@@ -203,5 +271,18 @@ function remove(id) {
 .card-footer {
   margin-top: 8px;
   text-align: right;
+}
+@media (max-width: 640px) {
+  .acceptance-head {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .fail-item-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .fail-item-row .el-button {
+    align-self: flex-end;
+  }
 }
 </style>

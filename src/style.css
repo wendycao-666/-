@@ -134,36 +134,104 @@ body {
   color: #606266;
 }
 
-.nav-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 12px;
-}
-
-.nav-item {
-  cursor: pointer;
-  text-align: center;
-  transition: box-shadow 0.2s;
-}
-
-.nav-item :deep(.el-card__body) {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  padding: 24px 16px !important;
-}
-
-.nav-item:hover {
-  box-shadow: 0 2px 12px rgba(64, 158, 255, 0.15);
-}
-
 .el-button {
   border-radius: 6px;
 }
 
 @media (max-width: 640px) {
-  .nav-grid {
+  .app-main {
+    padding: 12px;
+    padding-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+
+  .page-title {
+    font-size: 18px;
+    margin-bottom: 12px;
+  }
+
+  .card-block :deep(.el-card__body) {
+    padding: 12px;
+  }
+
+  .stat-cards {
     grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .card-value {
+    font-size: 20px;
+  }
+
+  .card-row {
+    gap: 8px;
+    font-size: 13px;
+  }
+
+  .house-info {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .house-info .el-button {
+    width: 100%;
+  }
+
+  .page-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .page-header .page-title {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .page-header .el-button {
+    width: 100%;
+  }
+
+  .el-form-item {
+    display: block;
+    margin-bottom: 14px;
+  }
+
+  .el-form-item__label {
+    width: 100% !important;
+    height: auto !important;
+    line-height: 1.4;
+    text-align: left !important;
+    justify-content: flex-start !important;
+    padding-bottom: 6px;
+  }
+
+  .el-form-item__content {
+    margin-left: 0 !important;
+  }
+
+  .el-dialog {
+    width: calc(100vw - 24px) !important;
+    max-width: none !important;
+    margin: 12px auto !important;
+  }
+
+  .el-dialog__body {
+    padding: 12px 16px;
+  }
+
+  .el-dialog__footer {
+    display: flex;
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 12px 16px 16px;
+  }
+
+  .el-dialog__footer .el-button {
+    width: 100%;
+    margin: 0 !important;
+  }
+
+  .el-message-box {
+    width: calc(100vw - 32px) !important;
+    max-width: none !important;
   }
 }

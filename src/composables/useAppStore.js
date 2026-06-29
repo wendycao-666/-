@@ -2,12 +2,15 @@ import { reactive, computed } from 'vue'
 import {
   PROCESS_NAMES,
   MATERIAL_TEMPLATES,
+  SOFT_FURNISHING_TEMPLATES,
+  APPLIANCE_TEMPLATES,
   ACCEPTANCE_STATUS,
+  ACCEPTANCE_RESULT,
   PURCHASE_STATUS,
+  TODO_STATUS,
   PROCESS_WORKDAYS,
   PROJECT_START_DATE,
   SCHEDULE_VERSION,
-  BUDGET_TEMPLATES,
 } from '../constants'
 import { loadData, saveData } from '../utils/storage'
 import { todayStr } from '../utils/date'
@@ -19,6 +22,12 @@ import {
   calcProgress,
   calcMaterialStats,
 } from '../utils/calc'
+import {
+  syncAllProcurementBudgets,
+  syncBudgetToProcurement,
+  cleanupAllProcurementBudgets,
+  findProcurementItemByBudget,
+} from '../utils/materialBudgetSync'
 import { fetchProjectData, upsertProjectData } from '../utils/cloudStorage'
 import {
   isCloudConfigured,
@@ -61,36 +70,52 @@ function createDefaultMaterials() {
     advanceDays: item.advanceDays,
     actualOrderDate: '',
     expectedArrivalDate: '',
+    unitPrice: 0,
+    quantity: 1,
     cost: 0,
+    paidAmount: 0,
     purchaseStatus: PURCHASE_STATUS.PENDING,
     latestOrderDate: '',
     warningStatus: '正常',
   }))
 }
 
-function createDefaultBudgets() {
-  return BUDGET_TEMPLATES.map((item, index) => ({
-    id: String(index + 1),
-    category: item.category,
+function createDefaultProcurementItems(templates, prefix) {
+  return templates.map((item, index) => ({
+    id: `${prefix}-${index + 1}`,
     name: item.name,
-    unitPrice: item.unitPrice,
-    quantity: item.quantity,
-    paidAmount: item.paidAmount,
+    actualOrderDate: '',
+    expectedArrivalDate: '',
+    unitPrice: 0,
+    quantity: 1,
+    cost: 0,
+    paidAmount: 0,
+    purchaseStatus: PURCHASE_STATUS.PENDING,
   }))
 }
 
-function ensureDefaultBudgets(budgets) {
-  BUDGET_TEMPLATES.forEach((template) => {
-    if (!budgets.some((b) => b.name === template.name)) {
-      budgets.unshift({
-        id: crypto.randomUUID(),
-        category: template.category,
-        name: template.name,
-        unitPrice: template.unitPrice,
-        quantity: template.quantity,
-        paidAmount: template.paidAmount,
-      })
+function createDefaultSoftFurnishings() {
+  return createDefaultProcurementItems(SOFT_FURNISHING_TEMPLATES, 'soft')
+}
+
+function createDefaultAppliances() {
+  return createDefaultProcurementItems(APPLIANCE_TEMPLATES, 'appliance')
+}
+
+function createDefaultBudgets() {
+  return []
+}
+
+function normalizeBudgets(budgets) {
+  return budgets.map((item) => {
+    let next = { ...item }
+    if (item.name === '设计费' && item.category === '杂项') {
+      next.category = '设计'
     }
+    if (next.actualAmount === undefined || next.actualAmount === null) {
+      next.actualAmount = Number(item.paidAmount || 0)
+    }
+    return next
   })
 }
 
@@ -101,7 +126,10 @@ function createDefaultState() {
     house: { area: '', address: '' },
     processes,
     materials,
+    softFurnishings: createDefaultSoftFurnishings(),
+    appliances: createDefaultAppliances(),
     acceptances: [],
+    todos: [],
     budgets: createDefaultBudgets(),
     lastWarningRefreshDate: todayStr(),
   }
@@ -125,7 +153,14 @@ function serializeState() {
     house: { ...state.house },
     processes: state.processes.map((p) => ({ ...p })),
     materials: state.materials.map((m) => ({ ...m })),
-    acceptances: state.acceptances.map((a) => ({ ...a, images: [...a.images] })),
+    softFurnishings: state.softFurnishings.map((item) => ({ ...item })),
+    appliances: state.appliances.map((item) => ({ ...item })),
+    acceptances: state.acceptances.map((a) => ({
+      ...a,
+      images: [...a.images],
+      failItems: [...(a.failItems || [])],
+    })),
+    todos: state.todos.map((t) => ({ ...t })),
     budgets: state.budgets.map((b) => ({ ...b })),
     lastWarningRefreshDate: state.lastWarningRefreshDate,
   }
@@ -139,10 +174,20 @@ function applySavedData(saved) {
     state.processes = applyScheduleToProcesses(state.processes)
   }
   state.materials = refreshAllMaterials(saved.materials || createDefaultMaterials(), state.processes)
-  state.acceptances = saved.acceptances || []
-  state.budgets = saved.budgets?.length ? saved.budgets : createDefaultBudgets()
+  state.softFurnishings = saved.softFurnishings?.length
+    ? saved.softFurnishings
+    : createDefaultSoftFurnishings()
+  state.appliances = saved.appliances?.length ? saved.appliances : createDefaultAppliances()
+  state.acceptances = (saved.acceptances || []).map((a) => ({
+    ...a,
+    failItems: a.failItems || [],
+  }))
+  state.todos = normalizeTodos(saved.todos || [])
+  migrateFailAcceptancesToTodos()
+  state.budgets = saved.budgets?.length ? normalizeBudgets(saved.budgets) : createDefaultBudgets()
   state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
-  ensureDefaultBudgets(state.budgets)
+  syncAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
+  cleanupAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
 }
 
 function persistLocal() {
@@ -207,6 +252,67 @@ function refreshWarningsIfNeeded() {
   persist()
 }
 
+function normalizeTodo(todo) {
+  const status = todo.status || (todo.done ? TODO_STATUS.DONE : TODO_STATUS.PENDING)
+  return {
+    ...todo,
+    status,
+    completedAt: todo.completedAt || (status === TODO_STATUS.DONE ? todo.date : ''),
+  }
+}
+
+function normalizeTodos(todos) {
+  return todos.map(normalizeTodo)
+}
+
+function isTodoPending(todo) {
+  return todo.status === TODO_STATUS.PENDING
+}
+
+function migrateFailAcceptancesToTodos() {
+  state.acceptances.forEach((acceptance) => {
+    if (acceptance.result !== ACCEPTANCE_RESULT.FAIL) return
+    if (state.todos.some((t) => t.acceptanceId === acceptance.id)) return
+
+    const items = acceptance.failItems?.length
+      ? acceptance.failItems
+      : acceptance.comment
+        ? [acceptance.comment]
+        : []
+
+    items.filter(Boolean).forEach((content) => {
+      state.todos.push({
+        id: crypto.randomUUID(),
+        acceptanceId: acceptance.id,
+        processName: acceptance.processName,
+        content,
+        date: acceptance.date,
+        status: TODO_STATUS.PENDING,
+        completedAt: '',
+      })
+    })
+
+    if (!acceptance.failItems?.length && items.length) {
+      acceptance.failItems = [...items]
+    }
+  })
+}
+
+function createTodosFromAcceptance(acceptanceId, record) {
+  const items = record.failItems.filter(Boolean)
+  items.forEach((content) => {
+    state.todos.unshift({
+      id: crypto.randomUUID(),
+      acceptanceId,
+      processName: record.processName,
+      content,
+      date: record.date,
+      status: TODO_STATUS.PENDING,
+      completedAt: '',
+    })
+  })
+}
+
 function syncProcessAcceptance(processName) {
   const process = state.processes.find((p) => p.name === processName)
   if (!process) return
@@ -227,6 +333,17 @@ export function useAppStore() {
   const budgetSummary = computed(() => calcBudgetSummary(state.budgets))
   const materialStats = computed(() => calcMaterialStats(state.materials))
   const shareLink = computed(() => (syncMeta.projectId ? buildShareUrl(syncMeta.projectId) : ''))
+  const pendingTodoCount = computed(() => state.todos.filter((t) => isTodoPending(t)).length)
+  const todos = computed(() =>
+    [...state.todos].sort((a, b) => {
+      const aPending = isTodoPending(a)
+      const bPending = isTodoPending(b)
+      if (aPending !== bPending) return aPending ? -1 : 1
+      const aTime = a.completedAt || a.date
+      const bTime = b.completedAt || b.date
+      return bTime.localeCompare(aTime)
+    })
+  )
 
   async function createCloudProject() {
     if (!syncMeta.cloudReady) {
@@ -282,18 +399,45 @@ export function useAppStore() {
     if (!material) return
     Object.assign(material, data)
     state.materials = refreshAllMaterials(state.materials, state.processes)
+    syncAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
+    persist()
+  }
+
+  function updateSoftFurnishing(id, data) {
+    const item = state.softFurnishings.find((entry) => entry.id === id)
+    if (!item) return
+    Object.assign(item, data)
+    syncAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
+    persist()
+  }
+
+  function updateAppliance(id, data) {
+    const item = state.appliances.find((entry) => entry.id === id)
+    if (!item) return
+    Object.assign(item, data)
+    syncAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
     persist()
   }
 
   function addAcceptance(record) {
+    const id = crypto.randomUUID()
+    const failItems =
+      record.result === ACCEPTANCE_RESULT.FAIL ? record.failItems.filter(Boolean) : []
+
     state.acceptances.unshift({
-      id: crypto.randomUUID(),
+      id,
       processName: record.processName,
       date: record.date,
       result: record.result,
       comment: record.comment,
       images: record.images || [],
+      failItems,
     })
+
+    if (failItems.length) {
+      createTodosFromAcceptance(id, { ...record, failItems })
+    }
+
     syncProcessAcceptance(record.processName)
     persist()
   }
@@ -303,7 +447,31 @@ export function useAppStore() {
     if (index === -1) return
     const processName = state.acceptances[index].processName
     state.acceptances.splice(index, 1)
+    state.todos = state.todos.filter((t) => t.acceptanceId !== id)
     syncProcessAcceptance(processName)
+    persist()
+  }
+
+  function completeTodo(id) {
+    const todo = state.todos.find((t) => t.id === id)
+    if (!todo || !isTodoPending(todo)) return
+    todo.status = TODO_STATUS.DONE
+    todo.completedAt = todayStr()
+    persist()
+  }
+
+  function reopenTodo(id) {
+    const todo = state.todos.find((t) => t.id === id)
+    if (!todo || isTodoPending(todo)) return
+    todo.status = TODO_STATUS.PENDING
+    todo.completedAt = ''
+    persist()
+  }
+
+  function deleteTodo(id) {
+    const index = state.todos.findIndex((t) => t.id === id)
+    if (index === -1) return
+    state.todos.splice(index, 1)
     persist()
   }
 
@@ -314,6 +482,7 @@ export function useAppStore() {
       name: item.name,
       unitPrice: item.unitPrice,
       quantity: item.quantity,
+      actualAmount: item.actualAmount ?? 0,
       paidAmount: item.paidAmount,
     })
     persist()
@@ -322,16 +491,28 @@ export function useAppStore() {
   function updateBudget(id, item) {
     const budget = state.budgets.find((b) => b.id === id)
     if (!budget) return
-    Object.assign(budget, item)
+    const payload = { ...item }
+    const procurementItem = findProcurementItemByBudget(budget, state)
+    if (procurementItem) {
+      syncBudgetToProcurement({ ...budget, ...payload }, procurementItem)
+      payload.actualAmount = Number(procurementItem.cost || 0)
+      payload.unitPrice = procurementItem.unitPrice
+      payload.quantity = procurementItem.quantity
+      payload.paidAmount = procurementItem.paidAmount
+    }
+    Object.assign(budget, payload)
     persist()
   }
 
   function deleteBudget(id) {
+    const budget = state.budgets.find((b) => b.id === id)
+    if (findProcurementItemByBudget(budget, state)) return false
     const index = state.budgets.findIndex((b) => b.id === id)
     if (index !== -1) {
       state.budgets.splice(index, 1)
       persist()
     }
+    return true
   }
 
   function getProcessDays(process) {
@@ -345,6 +526,8 @@ export function useAppStore() {
     budgetSummary,
     materialStats,
     shareLink,
+    pendingTodoCount,
+    todos,
     initStore,
     refreshWarningsIfNeeded,
     createCloudProject,
@@ -352,8 +535,13 @@ export function useAppStore() {
     updateHouse,
     updateProcess,
     updateMaterial,
+    updateSoftFurnishing,
+    updateAppliance,
     addAcceptance,
     deleteAcceptance,
+    completeTodo,
+    reopenTodo,
+    deleteTodo,
     addBudget,
     updateBudget,
     deleteBudget,
