@@ -78,7 +78,7 @@
         class="card-block stat-card-link"
         :class="{ 'risk-card': pendingTodoCount > 0 }"
         shadow="never"
-        @click="router.push(ROUTES.TODO)"
+        @click="router.push(ROUTES.BUDGET)"
       >
         <div class="card-label">整改待办</div>
         <div class="card-value" :class="{ danger: pendingTodoCount > 0 }">{{ pendingTodoCount }}</div>

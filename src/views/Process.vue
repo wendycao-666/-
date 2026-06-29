@@ -1,7 +1,9 @@
 <template>
   <div class="page process-page">
-    <h2 class="page-title">工序进度甘特</h2>
+    <h2 class="page-title">工序</h2>
 
+    <el-tabs v-model="activeTab" class="process-tabs">
+      <el-tab-pane label="进度" name="schedule">
     <el-card class="card-block gantt-card" shadow="never">
       <div class="gantt-scroll">
         <div class="gantt-inner">
@@ -108,6 +110,11 @@
         <el-button type="primary" size="small" round @click="openEdit(process)">编辑</el-button>
       </div>
     </el-card>
+      </el-tab-pane>
+      <el-tab-pane label="验收" name="acceptance">
+        <AcceptanceSection />
+      </el-tab-pane>
+    </el-tabs>
 
     <el-dialog v-model="dialogVisible" title="编辑工序" width="90%" style="max-width: 420px">
       <el-form label-width="90px">
@@ -142,23 +149,69 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowRight } from '@element-plus/icons-vue'
 import { ACCEPTANCE_STATUS, PROCESS_SUBTASKS } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
 import { buildSubtaskSchedule } from '../utils/workday'
 import { todayStr, formatDate } from '../utils/date'
+import AcceptanceSection from '../components/AcceptanceSection.vue'
 
+const route = useRoute()
+const router = useRouter()
 const { state, updateProcess, getProcessDays } = useAppStore()
+
+const TAB_NAMES = ['schedule', 'acceptance']
+const activeTab = ref(TAB_NAMES.includes(route.query.tab) ? route.query.tab : 'schedule')
+
+watch(activeTab, (tab) => {
+  if (route.query.tab === tab) return
+  router.replace({ query: { ...route.query, tab } })
+})
+
+watch(
+  () => route.query.tab,
+  (tab) => {
+    if (TAB_NAMES.includes(tab) && tab !== activeTab.value) {
+      activeTab.value = tab
+    }
+  }
+)
 
 const dialogVisible = ref(false)
 const editingId = ref('')
 const form = reactive({ startDate: '', endDate: '', note: '' })
 
-const expandedGroups = reactive(
-  Object.fromEntries(state.processes.map((p) => [p.id, true]))
-)
+function findCurrentProcessId(processes) {
+  if (!processes.length) return null
+  const today = todayStr()
+  const sorted = [...processes].sort((a, b) => a.startDate.localeCompare(b.startDate))
+
+  const inProgress = sorted.find(
+    (process) => process.startDate && process.endDate && today >= process.startDate && today <= process.endDate
+  )
+  if (inProgress) return inProgress.id
+
+  if (today < sorted[0].startDate) return sorted[0].id
+
+  if (today > sorted[sorted.length - 1].endDate) return sorted[sorted.length - 1].id
+
+  const upcoming = sorted.find((process) => process.startDate > today)
+  return upcoming?.id || sorted[sorted.length - 1].id
+}
+
+function buildDefaultExpandedGroups() {
+  const currentId = findCurrentProcessId(state.processes)
+  return Object.fromEntries(state.processes.map((process) => [process.id, process.id === currentId]))
+}
+
+const expandedGroups = reactive(buildDefaultExpandedGroups())
+
+function toggleGroup(id) {
+  expandedGroups[id] = !expandedGroups[id]
+}
 
 const timeline = computed(() => {
   const dates = state.processes.flatMap((p) => [p.startDate, p.endDate]).filter(Boolean)
@@ -255,10 +308,6 @@ const ganttGroups = computed(() =>
   })
 )
 
-function toggleGroup(id) {
-  expandedGroups[id] = !expandedGroups[id]
-}
-
 function statusTagType(status) {
   if (status === ACCEPTANCE_STATUS.DONE) return 'success'
   if (status === ACCEPTANCE_STATUS.PARTIAL) return 'warning'
@@ -296,6 +345,9 @@ function onStatusChange(id, val) {
 </script>
 
 <style scoped>
+.process-tabs :deep(.el-tabs__header) {
+  margin-bottom: 12px;
+}
 .gantt-card {
   margin-bottom: 12px;
 }
@@ -470,6 +522,10 @@ function onStatusChange(id, val) {
   flex-wrap: wrap;
 }
 @media (max-width: 640px) {
+  .process-tabs :deep(.el-tabs__item) {
+    padding: 0 14px;
+    font-size: 14px;
+  }
   .gantt-inner {
     min-width: 520px;
   }

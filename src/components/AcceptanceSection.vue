@@ -1,7 +1,6 @@
 <template>
-  <div class="page acceptance-page">
-    <div class="page-header">
-      <h2 class="page-title">验收记录管理</h2>
+  <div class="acceptance-section">
+    <div class="section-toolbar">
       <el-button type="primary" round @click="openDialog">新增验收</el-button>
     </div>
 
@@ -64,16 +63,8 @@
         </el-form-item>
         <el-form-item v-if="form.result === ACCEPTANCE_RESULT.FAIL" label="不合格项" required>
           <div v-for="(_, index) in form.failItems" :key="index" class="fail-item-row">
-            <el-input
-              v-model="form.failItems[index]"
-              placeholder="描述不合格位置或问题"
-            />
-            <el-button
-              v-if="form.failItems.length > 1"
-              link
-              type="danger"
-              @click="removeFailItem(index)"
-            >
+            <el-input v-model="form.failItems[index]" placeholder="描述不合格位置或问题" />
+            <el-button v-if="form.failItems.length > 1" link type="danger" @click="removeFailItem(index)">
               删除
             </el-button>
           </div>
@@ -93,13 +84,7 @@
             <el-button type="primary" plain>选择图片</el-button>
           </el-upload>
           <div v-if="form.images.length" class="image-list preview-list">
-            <el-image
-              v-for="(img, idx) in form.images"
-              :key="idx"
-              :src="img"
-              fit="cover"
-              class="thumb"
-            />
+            <el-image v-for="(img, idx) in form.images" :key="idx" :src="img" fit="cover" class="thumb" />
           </div>
         </el-form-item>
       </el-form>
@@ -116,7 +101,7 @@ import { ref, reactive } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { PROCESS_NAMES, ACCEPTANCE_RESULT } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
-import EmptyState from '../components/EmptyState.vue'
+import EmptyState from './EmptyState.vue'
 
 const { state, addAcceptance, deleteAcceptance } = useAppStore()
 
@@ -205,14 +190,10 @@ function remove(id) {
 </script>
 
 <style scoped>
-.page-header {
+.section-toolbar {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
+  justify-content: flex-end;
   margin-bottom: 12px;
-}
-.page-header .page-title {
-  margin: 0;
 }
 .acceptance-card {
   margin-bottom: 12px;
@@ -273,6 +254,9 @@ function remove(id) {
   text-align: right;
 }
 @media (max-width: 640px) {
+  .section-toolbar .el-button {
+    width: 100%;
+  }
   .acceptance-head {
     flex-direction: column;
     gap: 8px;

@@ -1,17 +1,31 @@
 <template>
-  <div class="page todo-page">
-    <div class="page-header">
-      <h2 class="page-title">整改待办</h2>
-      <el-tag v-if="pendingTodoCount" type="danger" size="small">待处理 {{ pendingTodoCount }}</el-tag>
-    </div>
+  <div class="important-section">
+    <el-card
+      v-for="alert in alertItems"
+      :key="alert.key"
+      class="card-block alert-card"
+      :class="`alert-${alert.level}`"
+      shadow="never"
+      @click="alert.action"
+    >
+      <div class="alert-row">
+        <el-icon class="alert-icon"><component :is="alert.icon" /></el-icon>
+        <div class="alert-body">
+          <div class="alert-title">{{ alert.title }}</div>
+          <div class="alert-desc">{{ alert.desc }}</div>
+        </div>
+        <el-icon class="alert-arrow"><ArrowRight /></el-icon>
+      </div>
+    </el-card>
 
     <el-radio-group v-model="filter" class="filter-bar" size="small">
-      <el-radio-button label="pending">待办</el-radio-button>
+      <el-radio-button label="pending">待处理</el-radio-button>
       <el-radio-button label="done">已完成</el-radio-button>
       <el-radio-button label="all">全部</el-radio-button>
     </el-radio-group>
 
-    <EmptyState v-if="!filteredTodos.length" :text="emptyText" />
+    <EmptyState v-if="!filteredTodos.length && !alertItems.length" text="暂无重要事项，一切正常" />
+    <EmptyState v-else-if="!filteredTodos.length" :text="emptyText" />
 
     <el-card
       v-for="item in filteredTodos"
@@ -59,14 +73,52 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { TODO_EMPTY_TEXT, TODO_STATUS } from '../constants'
+import { ArrowRight, WarningFilled, Clock, Wallet } from '@element-plus/icons-vue'
+import { ROUTES, TODO_EMPTY_TEXT, TODO_STATUS } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
-import EmptyState from '../components/EmptyState.vue'
+import EmptyState from './EmptyState.vue'
 
-const { todos, pendingTodoCount, completeTodo, reopenTodo } = useAppStore()
+const router = useRouter()
+const { todos, materialStats, budgetSummary, completeTodo, reopenTodo } = useAppStore()
 
 const filter = ref('pending')
+
+const alertItems = computed(() => {
+  const items = []
+  if (materialStats.value.overdue > 0) {
+    items.push({
+      key: 'material-overdue',
+      level: 'danger',
+      icon: WarningFilled,
+      title: `主材逾期 ${materialStats.value.overdue} 项`,
+      desc: '请尽快处理采购下单',
+      action: () => router.push({ path: ROUTES.PROCUREMENT, query: { tab: 'material' } }),
+    })
+  }
+  if (materialStats.value.expiring > 0) {
+    items.push({
+      key: 'material-expiring',
+      level: 'warning',
+      icon: Clock,
+      title: `主材即将到期 ${materialStats.value.expiring} 项`,
+      desc: '建议近期安排下单',
+      action: () => router.push({ path: ROUTES.PROCUREMENT, query: { tab: 'material' } }),
+    })
+  }
+  if (budgetSummary.value.isOverBudget) {
+    items.push({
+      key: 'budget-over',
+      level: 'danger',
+      icon: Wallet,
+      title: '预算已超支',
+      desc: '已支付金额超过总预算',
+      action: () => {},
+    })
+  }
+  return items
+})
 
 const filteredTodos = computed(() => {
   if (filter.value === 'pending') return todos.value.filter((t) => t.status === TODO_STATUS.PENDING)
@@ -76,7 +128,6 @@ const filteredTodos = computed(() => {
 
 const emptyText = computed(() => {
   if (filter.value === 'done') return '暂无已完成整改项'
-  if (filter.value === 'pending') return TODO_EMPTY_TEXT
   return TODO_EMPTY_TEXT
 })
 
@@ -104,17 +155,56 @@ function handleReopen(id) {
 </script>
 
 <style scoped>
-.page-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 12px;
+.alert-card {
+  margin-bottom: 10px;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
 }
-.page-header .page-title {
-  margin: 0;
+.alert-card:hover {
+  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.12);
+  transform: translateY(-1px);
+}
+.alert-danger {
+  border-left: 3px solid #F56C6C;
+}
+.alert-warning {
+  border-left: 3px solid #E6A23C;
+}
+.alert-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.alert-icon {
+  font-size: 22px;
+  flex-shrink: 0;
+}
+.alert-danger .alert-icon {
+  color: #F56C6C;
+}
+.alert-warning .alert-icon {
+  color: #E6A23C;
+}
+.alert-body {
+  flex: 1;
+  min-width: 0;
+}
+.alert-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.alert-desc {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 2px;
+}
+.alert-arrow {
+  color: #C0C4CC;
+  flex-shrink: 0;
 }
 .filter-bar {
-  margin-bottom: 12px;
+  margin: 12px 0;
 }
 .todo-card {
   margin-bottom: 12px;

@@ -3,9 +3,7 @@ import { ROUTES } from '../constants'
 import Home from '../views/Home.vue'
 import Process from '../views/Process.vue'
 import Procurement from '../views/Procurement.vue'
-import Acceptance from '../views/Acceptance.vue'
 import Budget from '../views/Budget.vue'
-import Todo from '../views/Todo.vue'
 
 const routes = [
   { path: ROUTES.HOME, name: 'Home', component: Home },
@@ -13,8 +11,8 @@ const routes = [
   { path: ROUTES.PROCUREMENT, name: 'Procurement', component: Procurement },
   { path: '/material', redirect: { path: ROUTES.PROCUREMENT, query: { tab: 'material' } } },
   { path: '/furnishing', redirect: (to) => ({ path: ROUTES.PROCUREMENT, query: { tab: to.query.tab || 'soft' } }) },
-  { path: ROUTES.ACCEPTANCE, name: 'Acceptance', component: Acceptance },
-  { path: ROUTES.TODO, name: 'Todo', component: Todo },
+  { path: ROUTES.ACCEPTANCE, redirect: { path: ROUTES.PROCESS, query: { tab: 'acceptance' } } },
+  { path: ROUTES.TODO, redirect: ROUTES.BUDGET },
   { path: ROUTES.BUDGET, name: 'Budget', component: Budget },
 ]
 

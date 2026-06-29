@@ -1,7 +1,18 @@
 <template>
-  <div class="page budget-page">
-    <div class="page-header">
-      <h2 class="page-title">预算管理</h2>
+  <div class="page mine-page">
+    <h2 class="page-title">我的</h2>
+
+    <section class="mine-section">
+      <div class="section-header">
+        <h3 class="section-title">重要事项</h3>
+        <el-tag v-if="pendingTodoCount" type="danger" size="small">待处理 {{ pendingTodoCount }}</el-tag>
+      </div>
+      <ImportantMattersSection />
+    </section>
+
+    <section class="mine-section">
+      <div class="page-header budget-section-header">
+      <h3 class="section-title">预算管理</h3>
       <el-button type="primary" round @click="openDialog()">新增预算</el-button>
     </div>
 
@@ -36,43 +47,76 @@
     </el-card>
 
     <EmptyState v-if="!visibleBudgets.length" />
-    <el-card v-for="item in visibleBudgets" :key="item.id" class="card-block budget-card" shadow="never">
-      <div class="budget-head">
-        <div>
-          <h3>{{ item.name }}</h3>
-          <el-tag size="small" type="info">{{ item.category }}</el-tag>
-          <el-tag v-if="getProcurementBudgetSource(item)" size="small" type="success" class="sync-tag">
-            {{ getProcurementSyncLabel(item) }}
-          </el-tag>
+
+    <div v-if="visibleBudgets.length" class="budget-detail-block">
+      <div class="budget-detail-entry" @click="budgetDetailExpanded = !budgetDetailExpanded">
+        <div class="detail-entry-left">
+          <span class="detail-entry-label">预算明细</span>
+          <span class="detail-entry-count">{{ visibleBudgets.length }} 项</span>
         </div>
-        <div class="budget-actions">
-          <el-button type="primary" link @click="openDialog(item)">编辑</el-button>
-          <el-button v-if="!getProcurementBudgetSource(item)" type="danger" link @click="remove(item.id)">删除</el-button>
-        </div>
+        <el-icon class="detail-entry-arrow" :class="{ expanded: budgetDetailExpanded }">
+          <ArrowRight />
+        </el-icon>
       </div>
-      <div class="budget-compare">
-        <div class="compare-item">
-          <span class="compare-label">预算</span>
-          <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
-        </div>
-        <div class="compare-item">
-          <span class="compare-label">已支付</span>
-          <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).paid) }}</span>
-        </div>
-        <div class="compare-item">
-          <span class="compare-label">差额</span>
-          <span class="compare-value" :class="varianceClass(getItemVariance(item).variance)">
-            {{ formatVariance(getItemVariance(item).variance) }}
-          </span>
-        </div>
+
+      <div v-show="budgetDetailExpanded" class="budget-detail-list">
+        <el-card v-for="item in visibleBudgets" :key="item.id" class="card-block budget-card" shadow="never">
+          <div class="budget-head">
+            <div>
+              <h3>{{ item.name }}</h3>
+              <el-tag size="small" type="info">{{ item.category }}</el-tag>
+              <el-tag v-if="getProcurementBudgetSource(item)" size="small" type="success" class="sync-tag">
+                {{ getProcurementSyncLabel(item) }}
+              </el-tag>
+            </div>
+            <div class="budget-actions">
+              <el-button type="primary" link @click="openDialog(item)">编辑</el-button>
+              <el-button v-if="!getProcurementBudgetSource(item)" type="danger" link @click="remove(item.id)">删除</el-button>
+            </div>
+          </div>
+          <div class="budget-compare">
+            <div class="compare-item">
+              <span class="compare-label">预算</span>
+              <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
+            </div>
+            <div class="compare-item">
+              <span class="compare-label">已支付</span>
+              <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).paid) }}</span>
+            </div>
+            <div class="compare-item">
+              <span class="compare-label">差额</span>
+              <span class="compare-value" :class="varianceClass(getItemVariance(item).variance)">
+                {{ formatVariance(getItemVariance(item).variance) }}
+              </span>
+            </div>
+          </div>
+          <div class="budget-detail-panel">
+            <div class="detail-row">
+              <span class="detail-label">单价</span>
+              <span class="detail-value">¥ {{ formatMoney(item.unitPrice) }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">数量</span>
+              <span class="detail-value">{{ item.quantity }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">预算金额</span>
+              <span class="detail-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">实际费用</span>
+              <span class="detail-value">¥ {{ formatMoney(item.actualAmount) }}</span>
+            </div>
+            <div class="detail-row">
+              <span class="detail-label">已支付</span>
+              <span class="detail-value">¥ {{ formatMoney(item.paidAmount) }}</span>
+            </div>
+          </div>
+        </el-card>
       </div>
-      <div class="budget-meta">
-        <span>单价：¥ {{ formatMoney(item.unitPrice) }}</span>
-        <span>数量：{{ item.quantity }}</span>
-        <span>实际费用：¥ {{ formatMoney(item.actualAmount) }}</span>
-        <span>已支付：¥ {{ formatMoney(item.paidAmount) }}</span>
-      </div>
-    </el-card>
+    </div>
+
+    </section>
 
     <el-dialog
       v-model="dialogVisible"
@@ -147,10 +191,12 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { ArrowRight } from '@element-plus/icons-vue'
 import { BUDGET_CATEGORIES, MANUAL_BUDGET_CATEGORIES, COLORS } from '../constants'
 import { calcBudgetItemTotal, calcBudgetCategoryStats, calcBudgetItemVariance, calcBudgetSummary, isBudgetItemVisible } from '../utils/calc'
 import { getProcurementBudgetSource } from '../utils/materialBudgetSync'
 import { useAppStore } from '../composables/useAppStore'
+import ImportantMattersSection from '../components/ImportantMattersSection.vue'
 import EmptyState from '../components/EmptyState.vue'
 import BudgetPieChart from '../components/BudgetPieChart.vue'
 
@@ -164,7 +210,7 @@ const CATEGORY_COLORS = {
   杂项: COLORS.info,
 }
 
-const { state, addBudget, updateBudget, deleteBudget } = useAppStore()
+const { state, pendingTodoCount, addBudget, updateBudget, deleteBudget } = useAppStore()
 
 const visibleBudgets = computed(() => state.budgets.filter(isBudgetItemVisible))
 
@@ -185,6 +231,7 @@ const categoryChartData = computed(() =>
 
 const dialogVisible = ref(false)
 const editingId = ref('')
+const budgetDetailExpanded = ref(false)
 const form = reactive({
   category: '',
   name: '',
@@ -317,6 +364,27 @@ function remove(id) {
 </script>
 
 <style scoped>
+.section-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: #303133;
+}
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+.mine-section {
+  margin-bottom: 20px;
+}
+.mine-section:last-child {
+  margin-bottom: 0;
+}
+.budget-section-header {
+  margin-bottom: 12px;
+}
 .page-header {
   display: flex;
   justify-content: space-between;
@@ -393,12 +461,83 @@ function remove(id) {
 .card-value.primary {
   color: #409EFF;
 }
-.budget-meta {
+.budget-detail-block {
+  margin-top: 4px;
+}
+.budget-detail-list {
+  margin-top: 10px;
+}
+.budget-detail-list .budget-card {
+  margin-bottom: 12px;
+}
+.budget-detail-list .budget-card:last-child {
+  margin-bottom: 0;
+}
+.budget-detail-list .budget-detail-panel {
+  margin-top: 8px;
+  padding: 4px 12px 8px;
+  border-left: 2px solid #ecf5ff;
+  margin-left: 4px;
+}
+.budget-detail-entry {
   display: flex;
-  flex-wrap: wrap;
-  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 14px;
+  background: #fff;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.2s, border-color 0.2s;
+}
+.budget-detail-entry:hover {
+  background: #f5f9ff;
+  border-color: #c6e2ff;
+}
+.detail-entry-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.detail-entry-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.detail-entry-count {
+  font-size: 12px;
+  color: #909399;
+  background: #f4f4f5;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+.detail-entry-arrow {
+  font-size: 16px;
+  color: #909399;
+  transition: transform 0.2s;
+}
+.detail-entry-arrow.expanded {
+  transform: rotate(90deg);
+  color: #409EFF;
+}
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
   font-size: 13px;
-  color: #606266;
+  border-bottom: 1px solid #f2f6fc;
+}
+.detail-row:last-child {
+  border-bottom: none;
+}
+.detail-label {
+  color: #909399;
+}
+.detail-value {
+  font-weight: 600;
+  color: #303133;
 }
 .budget-actions {
   display: flex;
@@ -419,10 +558,6 @@ function remove(id) {
   }
   .budget-actions {
     align-self: flex-end;
-  }
-  .budget-meta {
-    flex-direction: column;
-    gap: 6px;
   }
   .budget-compare {
     grid-template-columns: 1fr;
