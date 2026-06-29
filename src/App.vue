@@ -86,9 +86,10 @@ const navItems = [
 
 @media (max-width: 640px) {
   .app-header {
-    padding: 12px 12px 0;
+    padding: 12px 12px 10px;
     padding-left: max(12px, env(safe-area-inset-left));
     padding-right: max(12px, env(safe-area-inset-right));
+    border-bottom: 1px solid #ebeef5;
   }
 
   .logo {
@@ -96,26 +97,42 @@ const navItems = [
   }
 
   .app-nav {
-    justify-content: flex-start;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 100;
+    justify-content: space-around;
     flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none;
-    gap: 6px;
-    padding: 8px 12px 12px;
-    padding-left: max(12px, env(safe-area-inset-left));
-    padding-right: max(12px, env(safe-area-inset-right));
-  }
-
-  .app-nav::-webkit-scrollbar {
-    display: none;
+    overflow-x: visible;
+    gap: 0;
+    padding: 6px 4px;
+    padding-bottom: max(6px, env(safe-area-inset-bottom));
+    padding-left: max(4px, env(safe-area-inset-left));
+    padding-right: max(4px, env(safe-area-inset-right));
+    border-bottom: none;
+    border-top: 1px solid #ebeef5;
+    box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.06);
   }
 
   .nav-tab {
-    flex-shrink: 0;
-    min-width: auto;
-    padding: 6px 10px;
-    font-size: 12px;
+    flex: 1;
+    min-width: 0;
+    padding: 4px 2px;
+    font-size: 11px;
+    line-height: 1.2;
+    border-radius: 4px;
+    white-space: nowrap;
+  }
+
+  .nav-tab:hover {
+    background: transparent;
+  }
+
+  .nav-tab.router-link-active {
+    color: #409EFF;
+    background: #ecf5ff;
+    font-weight: 600;
   }
 }
 </style>

@@ -7,6 +7,8 @@
     "dev": "vite",
     "build": "vite build",
     "build:pages": "GITHUB_PAGES=true vite build && cp dist/index.html dist/404.html",
+    "sync:docs": "rm -rf docs && mkdir -p docs && cp -r dist/* docs/ && cp dist/index.html docs/404.html && touch docs/.nojekyll",
+    "build:pages:full": "npm run build:pages && npm run sync:docs",
     "preview": "vite preview"
   },
   "dependencies": {

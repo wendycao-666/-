@@ -11,6 +11,7 @@ import {
   PROCESS_WORKDAYS,
   PROJECT_START_DATE,
   SCHEDULE_VERSION,
+  DATA_VERSION,
 } from '../constants'
 import { loadData, saveData } from '../utils/storage'
 import { todayStr } from '../utils/date'
@@ -149,6 +150,7 @@ let cloudSaveTimer = null
 
 function serializeState() {
   return {
+    dataVersion: DATA_VERSION,
     scheduleVersion: SCHEDULE_VERSION,
     house: { ...state.house },
     processes: state.processes.map((p) => ({ ...p })),
@@ -166,18 +168,43 @@ function serializeState() {
   }
 }
 
+function mergeProcurementLists(saved, defaults) {
+  if (!Array.isArray(saved) || saved.length === 0) return { items: defaults, migrated: true }
+  const byName = Object.fromEntries(saved.map((item) => [item.name, item]))
+  const byId = Object.fromEntries(saved.map((item) => [item.id, item]))
+  let migrated = saved.length !== defaults.length
+  const items = defaults.map((def) => {
+    const matched = byName[def.name] || byId[def.id]
+    if (!matched) {
+      migrated = true
+      return { ...def }
+    }
+    return { ...def, ...matched, name: def.name }
+  })
+  return { items, migrated }
+}
+
 function applySavedData(saved) {
-  if (!saved) return
+  if (!saved) return false
+  let migrated = !saved.dataVersion || saved.dataVersion < DATA_VERSION
+
   Object.assign(state.house, saved.house || { area: '', address: '' })
   state.processes = saved.processes || createDefaultProcesses()
   if (!saved.scheduleVersion || saved.scheduleVersion < SCHEDULE_VERSION) {
     state.processes = applyScheduleToProcesses(state.processes)
+    migrated = true
   }
   state.materials = refreshAllMaterials(saved.materials || createDefaultMaterials(), state.processes)
-  state.softFurnishings = saved.softFurnishings?.length
-    ? saved.softFurnishings
-    : createDefaultSoftFurnishings()
-  state.appliances = saved.appliances?.length ? saved.appliances : createDefaultAppliances()
+  if (!saved.materials?.length) migrated = true
+
+  const soft = mergeProcurementLists(saved.softFurnishings, createDefaultSoftFurnishings())
+  state.softFurnishings = soft.items
+  migrated = migrated || soft.migrated
+
+  const appliances = mergeProcurementLists(saved.appliances, createDefaultAppliances())
+  state.appliances = appliances.items
+  migrated = migrated || appliances.migrated
+
   state.acceptances = (saved.acceptances || []).map((a) => ({
     ...a,
     failItems: a.failItems || [],
@@ -188,6 +215,7 @@ function applySavedData(saved) {
   state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
   syncAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
   cleanupAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
+  return migrated
 }
 
 function persistLocal() {
@@ -219,29 +247,33 @@ function persist() {
 async function initStore() {
   syncMeta.cloudReady = isCloudConfigured()
   syncMeta.projectId = getProjectIdFromUrl() || syncMeta.projectId
+  let migrated = false
 
   if (syncMeta.projectId && syncMeta.cloudReady) {
     syncMeta.syncing = true
     try {
       const remote = await fetchProjectData(syncMeta.projectId)
       if (remote) {
-        applySavedData(remote)
+        migrated = applySavedData(remote) || migrated
       } else {
-        applySavedData(loadData())
+        migrated = applySavedData(loadData()) || migrated
         await persistCloudNow()
       }
       setProjectIdInUrl(syncMeta.projectId)
     } catch (error) {
       syncMeta.syncError = error.message || '云端加载失败，已使用本地数据'
-      applySavedData(loadData())
+      migrated = applySavedData(loadData()) || migrated
     } finally {
       syncMeta.syncing = false
     }
   } else {
-    applySavedData(loadData())
+    migrated = applySavedData(loadData()) || migrated
   }
 
   refreshWarningsIfNeeded()
+  if (migrated) {
+    persist()
+  }
   syncMeta.initialized = true
 }
 
@@ -367,6 +399,7 @@ export function useAppStore() {
       if (remote) {
         applySavedData(remote)
       } else {
+        applySavedData(loadData())
         await persistCloudNow()
       }
     } finally {

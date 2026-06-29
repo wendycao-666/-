@@ -3,6 +3,9 @@ export const STORAGE_KEY = 'decoration_tool_data'
 /** 排期版本：变更后自动刷新工序默认日期 */
 export const SCHEDULE_VERSION = 1
 
+/** 数据结构版本：升级后自动补全采购等字段并写回本地/云端 */
+export const DATA_VERSION = 2
+
 /** 计划开工日 */
 export const PROJECT_START_DATE = '2026-07-06'
 
