@@ -16,6 +16,7 @@ import {
   SCHEDULE_VERSION,
   DATA_VERSION,
   LABOR_BUDGET_CATEGORY,
+  LABOR_BUDGET_TEMPLATES,
   OVERALL_BUDGET,
 } from '../constants'
 import { loadData, saveData } from '../utils/storage'
@@ -178,8 +179,61 @@ function createDefaultMiscBudgets() {
   }))
 }
 
+function createDefaultLaborBudgets() {
+  return LABOR_BUDGET_TEMPLATES.map((item, index) => ({
+    id: `labor-init-${index + 1}`,
+    category: LABOR_BUDGET_CATEGORY,
+    name: item.name,
+    note: item.note || '',
+    processName: item.processName,
+    unitPrice: 0,
+    quantity: 1,
+    actualAmount: 0,
+    paidAmount: 0,
+    laborInit: true,
+  }))
+}
+
 function createDefaultBudgets() {
-  return createDefaultMiscBudgets()
+  return [...createDefaultMiscBudgets(), ...createDefaultLaborBudgets()]
+}
+
+function mergeLaborBudgetInit(budgets) {
+  const next = [...budgets]
+
+  LABOR_BUDGET_TEMPLATES.forEach((template, index) => {
+    let budget = next.find(
+      (item) =>
+        item.category === LABOR_BUDGET_CATEGORY &&
+        (item.processName === template.processName || item.name === template.name)
+    )
+
+    if (budget) {
+      budget.laborInit = true
+      budget.processName = template.processName
+      budget.category = LABOR_BUDGET_CATEGORY
+      budget.name = budget.name || template.name
+      budget.note = budget.note || template.note || ''
+      if (budget.quantity === undefined || budget.quantity === null) budget.quantity = 1
+      delete budget.paymentRatio
+      return
+    }
+
+    next.push({
+      id: `labor-init-${index + 1}`,
+      category: LABOR_BUDGET_CATEGORY,
+      name: template.name,
+      note: template.note || '',
+      processName: template.processName,
+      unitPrice: 0,
+      quantity: 1,
+      actualAmount: 0,
+      paidAmount: 0,
+      laborInit: true,
+    })
+  })
+
+  return next
 }
 
 function normalizeBudgets(budgets) {
@@ -192,27 +246,18 @@ function normalizeBudgets(budgets) {
       next.actualAmount = Number(item.paidAmount || 0)
     }
     if (next.category === LABOR_BUDGET_CATEGORY) {
-      next.unitPrice = 0
-      next.quantity = 1
-      delete next.laborInit
-      delete next.processName
       delete next.paymentRatio
     }
     return next
   })
 }
 
-function sanitizeLaborBudgets(budgets) {
-  const filtered = budgets.filter((item) => !item.laborInit)
-  return {
-    budgets: normalizeBudgets(filtered),
-    removedTemplates: filtered.length !== budgets.length,
-  }
-}
-
 function applyLaborBudgetPayload(item) {
   if (item.category !== LABOR_BUDGET_CATEGORY) return item
-  return { ...item, unitPrice: 0, quantity: 1 }
+  return {
+    ...item,
+    processName: item.processName || '',
+  }
 }
 
 function createDefaultState() {
@@ -444,12 +489,9 @@ function applySavedData(saved) {
     state.budgets = mergedBudgets
     if (!saved.dataVersion || saved.dataVersion < 5) migrated = true
   }
-  const laborSanitized = sanitizeLaborBudgets(state.budgets)
-  const hadLaborPrices = (saved.budgets || []).some(
-    (item) => item.category === LABOR_BUDGET_CATEGORY && Number(item.unitPrice || 0) > 0
-  )
-  if (!saved.dataVersion || saved.dataVersion < 11 || laborSanitized.removedTemplates || hadLaborPrices) {
-    state.budgets = laborSanitized.budgets
+  const mergedLaborBudgets = mergeLaborBudgetInit(state.budgets)
+  if (!saved.dataVersion || saved.dataVersion < 13) {
+    state.budgets = normalizeBudgets(mergedLaborBudgets)
     migrated = true
   }
   state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
@@ -785,6 +827,7 @@ export function useAppStore() {
       category: payload.category,
       name: payload.name,
       note: payload.note || '',
+      processName: payload.processName || '',
       unitPrice: payload.unitPrice,
       quantity: payload.quantity,
       actualAmount: payload.actualAmount ?? 0,

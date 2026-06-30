@@ -82,97 +82,173 @@
       <EmptyState v-if="!visibleBudgets.length" />
 
       <div v-if="visibleBudgets.length" class="budget-detail-list">
-        <section
-          v-for="group in budgetDetailGroups"
-          :key="group.category"
-          class="budget-category-group"
-        >
-          <div class="budget-category-head">
-            <span class="category-dot" :style="{ background: getCategoryColor(group.category) }" />
-            <div class="category-head-main">
-              <h4 class="category-title">{{ group.category }}</h4>
-              <span class="category-meta">
-                <template v-if="isLaborCategory(group.category)">
-                  {{ group.count }} 项 · 已支付 ¥ {{ formatMoney(group.paidTotal) }} · 不做预算预估
-                </template>
-                <template v-else>
-                  {{ group.count }} 项 · 预算 ¥ {{ formatMoney(group.budgetTotal) }} · 已支付 ¥ {{ formatMoney(group.paidTotal) }}
-                </template>
-              </span>
-            </div>
-          </div>
-          <el-card
-            v-for="item in group.items"
-            :key="item.id"
-            class="card-block budget-card"
-            shadow="never"
+        <el-collapse v-model="expandedCategories" class="category-collapse">
+          <el-collapse-item
+            v-for="group in budgetDetailGroups"
+            :key="group.category"
+            :name="group.category"
           >
-            <div class="budget-head">
-              <div>
-                <h3>{{ item.name }}</h3>
-                <el-tag v-if="getProcurementBudgetSource(item)" size="small" type="success" class="sync-tag">
-                  {{ getProcurementSyncLabel(item) }}
-                </el-tag>
+            <template #title>
+              <div class="category-collapse-title">
+                <span class="category-dot" :style="{ background: getCategoryColor(group.category) }" />
+                <div class="category-head-main">
+                  <span class="category-title">{{ group.category }}</span>
+                  <span class="category-meta">
+                    {{ group.count }} 项 · 预算 ¥ {{ formatMoney(group.budgetTotal) }} · 已支付 ¥ {{ formatMoney(group.paidTotal) }}
+                  </span>
+                </div>
               </div>
-              <div class="budget-actions">
-                <el-button type="primary" link @click="openDialog(item)">编辑</el-button>
-                <el-button v-if="!getProcurementBudgetSource(item)" type="danger" link @click="remove(item.id)">删除</el-button>
-              </div>
-            </div>
-            <div v-if="item.note" class="budget-note">
-              <span class="note-label">备注</span>
-              <p class="note-text">{{ item.note }}</p>
-            </div>
-            <div v-if="isLaborBudgetItem(item)" class="budget-compare budget-compare-labor">
-              <div class="compare-item">
-                <span class="compare-label">实际费用</span>
-                <span class="compare-value">¥ {{ formatMoney(item.actualAmount) }}</span>
-              </div>
-              <div class="compare-item">
-                <span class="compare-label">已支付</span>
-                <span class="compare-value">¥ {{ formatMoney(item.paidAmount) }}</span>
-              </div>
-            </div>
-            <div v-else class="budget-compare">
-              <div class="compare-item">
-                <span class="compare-label">预算</span>
-                <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
-              </div>
-              <div class="compare-item">
-                <span class="compare-label">已支付</span>
-                <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).paid) }}</span>
-              </div>
-              <div class="compare-item">
-                <span class="compare-label">差额</span>
-                <span class="compare-value" :class="varianceClass(getItemVariance(item).variance)">
-                  {{ formatVariance(getItemVariance(item).variance) }}
-                </span>
-              </div>
-            </div>
-            <div v-if="!isLaborBudgetItem(item)" class="budget-detail-panel">
-              <div class="detail-row">
-                <span class="detail-label">单价</span>
-                <span class="detail-value">¥ {{ formatMoney(item.unitPrice) }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">数量</span>
-                <span class="detail-value">{{ item.quantity }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">预算金额</span>
-                <span class="detail-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">实际费用</span>
-                <span class="detail-value">¥ {{ formatMoney(item.actualAmount) }}</span>
-              </div>
-              <div class="detail-row">
-                <span class="detail-label">已支付</span>
-                <span class="detail-value">¥ {{ formatMoney(item.paidAmount) }}</span>
-              </div>
-            </div>
-          </el-card>
-        </section>
+            </template>
+
+            <template v-if="isLaborCategory(group.category)">
+              <el-collapse v-model="expandedLaborPanels" class="nested-collapse">
+                <el-collapse-item
+                  v-for="sub in getLaborSubgroups(group.items)"
+                  :key="sub.processName"
+                  :name="sub.processName"
+                >
+                  <template #title>
+                    <div class="nested-collapse-title">
+                      <span class="nested-collapse-name">{{ sub.processName }}</span>
+                      <span class="nested-collapse-meta">
+                        {{ sub.items.length }} 项 · 预算 ¥ {{ formatMoney(sub.budgetTotal) }} · 已支付 ¥ {{ formatMoney(sub.paidTotal) }}
+                      </span>
+                    </div>
+                  </template>
+                  <div
+                    v-for="item in sub.items"
+                    :key="item.id"
+                    class="budget-item-block"
+                  >
+                    <div class="budget-head">
+                      <div>
+                        <h3>{{ item.name }}</h3>
+                      </div>
+                      <div class="budget-actions">
+                        <el-button type="primary" link @click="openDialog(item)">编辑</el-button>
+                        <el-button v-if="!getProcurementBudgetSource(item)" type="danger" link @click="remove(item.id)">删除</el-button>
+                      </div>
+                    </div>
+                    <div v-if="item.note" class="budget-note">
+                      <span class="note-label">备注</span>
+                      <p class="note-text">{{ item.note }}</p>
+                    </div>
+                    <div class="budget-compare">
+                      <div class="compare-item">
+                        <span class="compare-label">预算</span>
+                        <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
+                      </div>
+                      <div class="compare-item">
+                        <span class="compare-label">已支付</span>
+                        <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).paid) }}</span>
+                      </div>
+                      <div class="compare-item">
+                        <span class="compare-label">差额</span>
+                        <span class="compare-value" :class="varianceClass(getItemVariance(item).variance)">
+                          {{ formatVariance(getItemVariance(item).variance) }}
+                        </span>
+                      </div>
+                    </div>
+                    <div class="budget-detail-panel">
+                      <div class="detail-row">
+                        <span class="detail-label">单价</span>
+                        <span class="detail-value">¥ {{ formatMoney(item.unitPrice) }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <span class="detail-label">数量</span>
+                        <span class="detail-value">{{ item.quantity }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <span class="detail-label">预算金额</span>
+                        <span class="detail-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <span class="detail-label">实际费用</span>
+                        <span class="detail-value">¥ {{ formatMoney(item.actualAmount) }}</span>
+                      </div>
+                      <div class="detail-row">
+                        <span class="detail-label">已支付</span>
+                        <span class="detail-value">¥ {{ formatMoney(item.paidAmount) }}</span>
+                      </div>
+                    </div>
+                  </div>
+                </el-collapse-item>
+              </el-collapse>
+            </template>
+
+            <el-collapse v-else v-model="expandedBudgetItems" class="nested-collapse item-collapse">
+              <el-collapse-item
+                v-for="item in group.items"
+                :key="item.id"
+                :name="item.id"
+              >
+                <template #title>
+                  <div class="nested-collapse-title">
+                    <div class="item-title-main">
+                      <span class="nested-collapse-name">{{ item.name }}</span>
+                      <el-tag v-if="getProcurementBudgetSource(item)" size="small" type="success" class="sync-tag">
+                        {{ getProcurementSyncLabel(item) }}
+                      </el-tag>
+                    </div>
+                    <span class="nested-collapse-meta">
+                      预算 ¥ {{ formatMoney(getItemVariance(item).budget) }} · 已支付 ¥ {{ formatMoney(getItemVariance(item).paid) }}
+                    </span>
+                  </div>
+                </template>
+                <div class="budget-item-block">
+                  <div class="budget-head budget-head-compact">
+                    <div class="budget-actions">
+                      <el-button type="primary" link @click="openDialog(item)">编辑</el-button>
+                      <el-button v-if="!getProcurementBudgetSource(item)" type="danger" link @click="remove(item.id)">删除</el-button>
+                    </div>
+                  </div>
+                  <div v-if="item.note" class="budget-note">
+                    <span class="note-label">备注</span>
+                    <p class="note-text">{{ item.note }}</p>
+                  </div>
+                  <div class="budget-compare">
+                    <div class="compare-item">
+                      <span class="compare-label">预算</span>
+                      <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
+                    </div>
+                    <div class="compare-item">
+                      <span class="compare-label">已支付</span>
+                      <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).paid) }}</span>
+                    </div>
+                    <div class="compare-item">
+                      <span class="compare-label">差额</span>
+                      <span class="compare-value" :class="varianceClass(getItemVariance(item).variance)">
+                        {{ formatVariance(getItemVariance(item).variance) }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="budget-detail-panel">
+                    <div class="detail-row">
+                      <span class="detail-label">单价</span>
+                      <span class="detail-value">¥ {{ formatMoney(item.unitPrice) }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">数量</span>
+                      <span class="detail-value">{{ item.quantity }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">预算金额</span>
+                      <span class="detail-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">实际费用</span>
+                      <span class="detail-value">¥ {{ formatMoney(item.actualAmount) }}</span>
+                    </div>
+                    <div class="detail-row">
+                      <span class="detail-label">已支付</span>
+                      <span class="detail-value">¥ {{ formatMoney(item.paidAmount) }}</span>
+                    </div>
+                  </div>
+                </div>
+              </el-collapse-item>
+            </el-collapse>
+          </el-collapse-item>
+        </el-collapse>
       </div>
 
     </section>
@@ -198,6 +274,16 @@
             <el-option v-for="cat in MANUAL_BUDGET_CATEGORIES" :key="cat" :label="cat" :value="cat" />
           </el-select>
         </el-form-item>
+        <el-form-item v-if="isLaborForm" label="归属工序" required>
+          <el-select
+            v-model="form.processName"
+            placeholder="请选择施工阶段"
+            style="width: 100%"
+            :disabled="form.procurementLinked"
+          >
+            <el-option v-for="process in PROCESS_NAMES" :key="process" :label="process" :value="process" />
+          </el-select>
+        </el-form-item>
         <el-form-item label="项目名称" required>
           <el-input v-model="form.name" placeholder="请输入项目名称" :disabled="form.procurementLinked" />
         </el-form-item>
@@ -209,30 +295,29 @@
             placeholder="填写备注或注意事项"
           />
         </el-form-item>
-        <template v-if="!isLaborForm">
-          <el-form-item label="预算单价" required>
-            <el-input-number
-              v-model="form.unitPrice"
-              :min="0"
-              :precision="2"
-              controls-position="right"
-              style="width: 100%"
-            />
-          </el-form-item>
-          <el-form-item label="数量" required>
-            <el-input-number
-              v-model="form.quantity"
-              :min="0"
-              :precision="2"
-              controls-position="right"
-              style="width: 100%"
-            />
-          </el-form-item>
-          <el-form-item label="预算金额">
-            <span class="readonly-value">¥ {{ formatMoney(calcBudgetItemTotal(form.unitPrice, form.quantity)) }}</span>
-          </el-form-item>
-        </template>
-        <p v-else class="labor-form-tip">人工类仅记录实际支出，不填写预算单价。</p>
+        <el-form-item label="预算单价" required>
+          <el-input-number
+            v-model="form.unitPrice"
+            :min="0"
+            :precision="2"
+            controls-position="right"
+            style="width: 100%"
+            :disabled="form.procurementLinked"
+          />
+        </el-form-item>
+        <el-form-item label="数量" required>
+          <el-input-number
+            v-model="form.quantity"
+            :min="0"
+            :precision="2"
+            controls-position="right"
+            style="width: 100%"
+            :disabled="form.procurementLinked"
+          />
+        </el-form-item>
+        <el-form-item label="预算金额">
+          <span class="readonly-value">¥ {{ formatMoney(calcBudgetItemTotal(form.unitPrice, form.quantity)) }}</span>
+        </el-form-item>
         <el-form-item label="实际费用">
           <el-input-number
             v-if="!form.procurementLinked"
@@ -263,9 +348,17 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed } from 'vue'
+import { ref, reactive, computed, watch, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { BUDGET_CATEGORIES, MANUAL_BUDGET_CATEGORIES, COLORS, LABOR_BUDGET_CATEGORY, OVERALL_BUDGET } from '../constants'
+import {
+  BUDGET_CATEGORIES,
+  MANUAL_BUDGET_CATEGORIES,
+  COLORS,
+  LABOR_BUDGET_CATEGORY,
+  LABOR_BUDGET_TEMPLATES,
+  OVERALL_BUDGET,
+  PROCESS_NAMES,
+} from '../constants'
 import {
   calcBudgetItemTotal,
   calcBudgetCategoryActualStats,
@@ -273,7 +366,6 @@ import {
   calcBudgetSummary,
   calcBudgetItemPlanningAmount,
   isBudgetItemVisible,
-  isLaborBudgetItem,
 } from '../utils/calc'
 import { formatMoney, formatVariance } from '../utils/format'
 import { getProcurementBudgetSource, getProcurementSyncLabel } from '../utils/materialBudgetSync'
@@ -342,8 +434,26 @@ const budgetDetailGroups = computed(() =>
 
 const dialogVisible = ref(false)
 const editingId = ref('')
+const skipCategorySideEffect = ref(false)
+const expandedCategories = ref([...BUDGET_CATEGORIES])
+const expandedLaborPanels = ref([...PROCESS_NAMES, '未指定工序'])
+const expandedBudgetItems = ref([])
+
+watch(
+  visibleBudgets,
+  (items) => {
+    const ids = items.filter((item) => item.category !== LABOR_BUDGET_CATEGORY).map((item) => item.id)
+    const next = expandedBudgetItems.value.filter((id) => ids.includes(id))
+    ids.forEach((id) => {
+      if (!next.includes(id)) next.push(id)
+    })
+    expandedBudgetItems.value = next
+  },
+  { immediate: true }
+)
 const form = reactive({
   category: '',
+  processName: '',
   name: '',
   note: '',
   unitPrice: 0,
@@ -353,6 +463,57 @@ const form = reactive({
   procurementLinked: false,
   procurementPage: '',
 })
+
+function getLaborSubgroups(items) {
+  const groups = PROCESS_NAMES.map((processName) => {
+    const subItems = items.filter((item) => item.processName === processName)
+    if (!subItems.length) return null
+    const paidTotal = subItems.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0)
+    const budgetTotal = subItems.reduce((sum, item) => sum + calcBudgetItemPlanningAmount(item), 0)
+    return { processName, items: subItems, paidTotal, budgetTotal }
+  }).filter(Boolean)
+
+  const unassigned = items.filter(
+    (item) => !item.processName || !PROCESS_NAMES.includes(item.processName)
+  )
+  if (unassigned.length) {
+    groups.push({
+      processName: '未指定工序',
+      items: unassigned,
+      paidTotal: unassigned.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+      budgetTotal: unassigned.reduce((sum, item) => sum + calcBudgetItemPlanningAmount(item), 0),
+    })
+  }
+
+  return groups
+}
+
+watch(
+  () => form.category,
+  (category) => {
+    if (skipCategorySideEffect.value) return
+    if (category === LABOR_BUDGET_CATEGORY) {
+      if (!form.processName) form.processName = PROCESS_NAMES[0]
+      return
+    }
+    form.processName = ''
+    if (!form.procurementLinked) {
+      form.name = ''
+      form.note = ''
+    }
+  }
+)
+
+watch(
+  () => [form.category, form.processName],
+  () => {
+    if (!isLaborForm.value || editingId.value || !form.processName) return
+    const template = LABOR_BUDGET_TEMPLATES.find((item) => item.processName === form.processName)
+    if (!template) return
+    form.name = template.name
+    form.note = template.note || ''
+  }
+)
 
 function isLaborCategory(category) {
   return category === LABOR_BUDGET_CATEGORY
@@ -388,10 +549,12 @@ function getCategoryColor(category) {
 }
 
 function openDialog(item) {
+  skipCategorySideEffect.value = true
   if (item) {
     const source = getProcurementBudgetSource(item)
     editingId.value = item.id
     form.category = item.category
+    form.processName = item.processName || ''
     form.name = item.name
     form.note = item.note || ''
     form.unitPrice = item.unitPrice
@@ -403,6 +566,7 @@ function openDialog(item) {
   } else {
     editingId.value = ''
     form.category = '人工'
+    form.processName = PROCESS_NAMES[0]
     form.name = ''
     form.note = ''
     form.unitPrice = 0
@@ -413,6 +577,16 @@ function openDialog(item) {
     form.procurementPage = ''
   }
   dialogVisible.value = true
+  nextTick(() => {
+    skipCategorySideEffect.value = false
+    if (!item && form.category === LABOR_BUDGET_CATEGORY) {
+      const template = LABOR_BUDGET_TEMPLATES.find((entry) => entry.processName === form.processName)
+      if (template) {
+        form.name = template.name
+        form.note = template.note || ''
+      }
+    }
+  })
 }
 
 function validateForm() {
@@ -420,15 +594,19 @@ function validateForm() {
     ElMessage.warning('请完善必填信息')
     return false
   }
-  if (!isLaborForm.value) {
-    if (form.unitPrice === null || form.unitPrice === undefined || form.unitPrice < 0) {
-      ElMessage.warning('请完善必填信息')
+  if (isLaborForm.value) {
+    if (!form.processName) {
+      ElMessage.warning('请选择归属工序')
       return false
     }
-    if (form.quantity === null || form.quantity === undefined || form.quantity <= 0) {
-      ElMessage.warning('请完善必填信息')
-      return false
-    }
+  }
+  if (form.unitPrice === null || form.unitPrice === undefined || form.unitPrice < 0) {
+    ElMessage.warning('请完善必填信息')
+    return false
+  }
+  if (form.quantity === null || form.quantity === undefined || form.quantity <= 0) {
+    ElMessage.warning('请完善必填信息')
+    return false
   }
   if (form.actualAmount === null || form.actualAmount === undefined || form.actualAmount < 0) {
     ElMessage.warning('请完善必填信息')
@@ -447,8 +625,9 @@ function submit() {
     category: form.category,
     name: form.name.trim(),
     note: form.note || '',
-    unitPrice: isLaborForm.value ? 0 : Number(form.unitPrice),
-    quantity: isLaborForm.value ? 1 : Number(form.quantity),
+    processName: isLaborForm.value ? form.processName : '',
+    unitPrice: Number(form.unitPrice),
+    quantity: Number(form.quantity),
     actualAmount: Number(form.actualAmount),
     paidAmount: Number(form.paidAmount),
   }
@@ -598,12 +777,6 @@ function remove(id) {
 .budget-compare-labor {
   grid-template-columns: repeat(2, 1fr);
 }
-.labor-form-tip {
-  margin: 0 0 12px;
-  font-size: 13px;
-  color: #909399;
-  line-height: 1.5;
-}
 .compare-item {
   display: flex;
   flex-direction: column;
@@ -632,18 +805,39 @@ function remove(id) {
 .budget-detail-list {
   margin-top: 12px;
 }
-.budget-category-group {
-  margin-bottom: 16px;
+.category-collapse {
+  border: none;
 }
-.budget-category-group:last-child {
+.category-collapse > :deep(.el-collapse-item) {
+  margin-bottom: 12px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.category-collapse > :deep(.el-collapse-item:last-child) {
   margin-bottom: 0;
 }
-.budget-category-head {
+.category-collapse > :deep(.el-collapse-item__header) {
+  height: auto;
+  min-height: 48px;
+  padding: 10px 12px;
+  line-height: 1.4;
+  background: #fafafa;
+  border-bottom: none;
+}
+.category-collapse > :deep(.el-collapse-item__wrap) {
+  border-top: 1px solid #ebeef5;
+}
+.category-collapse > :deep(.el-collapse-item__content) {
+  padding: 10px 12px 12px;
+}
+.category-collapse-title {
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  margin-bottom: 10px;
-  padding: 0 2px;
+  width: 100%;
+  padding-right: 8px;
 }
 .category-dot {
   width: 4px;
@@ -657,6 +851,7 @@ function remove(id) {
   min-width: 0;
 }
 .category-title {
+  display: block;
   margin: 0 0 4px;
   font-size: 15px;
   font-weight: 600;
@@ -667,11 +862,64 @@ function remove(id) {
   color: #909399;
   line-height: 1.4;
 }
-.budget-detail-list .budget-card {
-  margin-bottom: 10px;
+.nested-collapse {
+  border: none;
 }
-.budget-detail-list .budget-category-group .budget-card:last-child {
+.nested-collapse :deep(.el-collapse-item) {
+  margin-bottom: 8px;
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #fff;
+}
+.nested-collapse :deep(.el-collapse-item:last-child) {
   margin-bottom: 0;
+}
+.nested-collapse :deep(.el-collapse-item__header) {
+  height: auto;
+  min-height: 42px;
+  padding: 8px 12px;
+  line-height: 1.4;
+  background: #f5f9ff;
+  border-bottom: none;
+}
+.nested-collapse :deep(.el-collapse-item__wrap) {
+  border-top: 1px solid #ebeef5;
+}
+.nested-collapse :deep(.el-collapse-item__content) {
+  padding: 10px 12px 12px;
+}
+.nested-collapse-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding-right: 8px;
+  flex-wrap: wrap;
+}
+.item-title-main {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.nested-collapse-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #303133;
+}
+.nested-collapse-meta {
+  font-size: 12px;
+  color: #909399;
+  flex-shrink: 0;
+}
+.budget-item-block {
+  padding: 0;
+}
+.budget-head-compact {
+  justify-content: flex-end;
+  margin-bottom: 8px;
 }
 .budget-detail-list .budget-detail-panel {
   margin-top: 8px;

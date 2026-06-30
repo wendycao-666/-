@@ -23,9 +23,8 @@ export function isLaborBudgetItem(item) {
   return item?.category === LABOR_BUDGET_CATEGORY
 }
 
-/** 计入明细总预算的计划金额（人工类不计入） */
+/** 计入明细总预算的计划金额 */
 export function calcBudgetItemPlanningAmount(item) {
-  if (isLaborBudgetItem(item)) return 0
   return calcBudgetItemTotal(item.unitPrice, item.quantity)
 }
 
@@ -33,9 +32,9 @@ export function calcBudgetItemTotal(unitPrice, quantity) {
   return Number(unitPrice || 0) * Number(quantity || 0)
 }
 
-/** 预算金额或实际费用大于 0，或杂项/人工项时在预算管理页展示 */
+/** 预算金额或实际费用大于 0，或杂项/人工默认项时在预算管理页展示 */
 export function isBudgetItemVisible(item) {
-  if (item.miscInit || isLaborBudgetItem(item)) return true
+  if (item.miscInit || item.laborInit) return true
   const budget = calcBudgetItemPlanningAmount(item)
   const actual = Number(item.actualAmount || 0)
   return budget > 0 || actual > 0

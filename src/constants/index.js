@@ -4,7 +4,7 @@ export const STORAGE_KEY = 'decoration_tool_data'
 export const SCHEDULE_VERSION = 2
 
 /** 数据结构版本：升级后自动补全采购等字段并写回本地/云端 */
-export const DATA_VERSION = 12
+export const DATA_VERSION = 13
 
 /** 计划开工日 */
 export const PROJECT_START_DATE = '2026-07-13'
@@ -245,8 +245,19 @@ export const MANUAL_BUDGET_CATEGORIES = [
   '杂项',
 ]
 
-/** 人工类：仅记录实际支出，不做预算单价预估 */
+/** 人工类：按施工阶段区分，支持填写预算与实际支出 */
 export const LABOR_BUDGET_CATEGORY = '人工'
+
+/** 人工费默认项：按 7 道工序区分，仅作占位与备注，不含预算单价 */
+export const LABOR_BUDGET_TEMPLATES = [
+  { processName: '拆改工程', name: '拆改工程款', note: '开工预付 / 拆改验收合格后支付' },
+  { processName: '水电改造', name: '水电工程款', note: '水电改造验收合格后支付' },
+  { processName: '泥瓦工程', name: '泥瓦工程款', note: '泥瓦工程验收合格后支付' },
+  { processName: '木作工程', name: '木作工程款', note: '木作工程验收合格后支付' },
+  { processName: '油漆工程', name: '油漆工程款', note: '油漆工程验收合格后支付' },
+  { processName: '安装阶段', name: '安装工程款', note: '安装阶段验收合格后支付' },
+  { processName: '开荒保洁', name: '保洁工程款', note: '开荒保洁完成后支付' },
+]
 
 /** 整体装修预算上限（元） */
 export const OVERALL_BUDGET = 180000
