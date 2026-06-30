@@ -5,8 +5,9 @@
         <div class="house-main">
           <p class="house-name">{{ state.house.address || '未填写房屋地址' }}</p>
           <p class="house-area">面积：{{ state.house.area ? `${state.house.area} ㎡` : '未填写' }}</p>
+          <p class="house-budget">装修总预算：¥ {{ formatMoney(overallBudget) }}</p>
         </div>
-        <el-button type="primary" round @click="openHouseDialog">编辑房屋信息</el-button>
+        <el-button type="primary" round @click="openHouseDialog">编辑项目信息</el-button>
       </div>
     </el-card>
 
@@ -80,13 +81,22 @@
       </el-card>
     </div>
 
-    <el-dialog v-model="houseDialogVisible" title="编辑房屋信息" width="90%" style="max-width: 420px">
-      <el-form label-width="80px">
+    <el-dialog v-model="houseDialogVisible" title="编辑项目信息" width="90%" style="max-width: 420px">
+      <el-form label-width="96px">
         <el-form-item label="房屋面积">
           <el-input v-model="houseForm.area" placeholder="请输入面积（㎡）" />
         </el-form-item>
         <el-form-item label="房屋地址">
           <el-input v-model="houseForm.address" placeholder="请输入房屋地址" type="textarea" :rows="2" />
+        </el-form-item>
+        <el-form-item label="装修总预算" required>
+          <el-input-number
+            v-model="houseForm.overallBudget"
+            :min="0"
+            :precision="2"
+            controls-position="right"
+            style="width: 100%"
+          />
         </el-form-item>
       </el-form>
       <template #footer>
@@ -99,8 +109,9 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
-import { ROUTES } from '../constants'
+import { ROUTES, OVERALL_BUDGET } from '../constants'
 import { formatMoney } from '../utils/format'
 import { useAppStore } from '../composables/useAppStore'
 import { getCurrentProcessInfo } from '../utils/calc'
@@ -112,12 +123,13 @@ const {
   budgetSummary,
   procurementWarningStats,
   pendingTodoCount,
+  overallBudget,
   refreshWarningsIfNeeded,
   updateHouse,
 } = useAppStore()
 
 const houseDialogVisible = ref(false)
-const houseForm = reactive({ area: '', address: '' })
+const houseForm = reactive({ area: '', address: '', overallBudget: OVERALL_BUDGET })
 
 const currentProgress = computed(() => getCurrentProcessInfo(state.processes))
 
@@ -128,11 +140,20 @@ onMounted(() => {
 function openHouseDialog() {
   houseForm.area = state.house.area
   houseForm.address = state.house.address
+  houseForm.overallBudget = Number(state.house.overallBudget) || OVERALL_BUDGET
   houseDialogVisible.value = true
 }
 
 function submitHouse() {
-  updateHouse({ area: houseForm.area.trim(), address: houseForm.address.trim() })
+  if (!houseForm.overallBudget || houseForm.overallBudget <= 0) {
+    ElMessage.warning('请填写有效的装修总预算')
+    return
+  }
+  updateHouse({
+    area: houseForm.area.trim(),
+    address: houseForm.address.trim(),
+    overallBudget: Number(houseForm.overallBudget),
+  })
   houseDialogVisible.value = false
 }
 </script>

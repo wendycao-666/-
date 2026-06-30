@@ -1,9 +1,5 @@
 <template>
   <div class="app-layout">
-    <header class="app-header">
-      <router-link to="/" class="logo">毛坯装修管理</router-link>
-    </header>
-
     <nav class="app-nav">
       <router-link
         v-for="item in navItems"
@@ -35,21 +31,6 @@ const navItems = [
 </script>
 
 <style scoped>
-.app-header {
-  padding: 16px 16px 12px;
-  text-align: center;
-  background: #fff;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.logo {
-  display: inline-block;
-  font-size: 18px;
-  font-weight: 600;
-  color: #409EFF;
-  text-decoration: none;
-}
-
 .app-nav {
   display: flex;
   justify-content: center;
@@ -101,16 +82,6 @@ const navItems = [
 }
 
 @media (max-width: 640px) {
-  .app-header {
-    padding: 12px 12px 10px;
-    padding-left: max(12px, env(safe-area-inset-left));
-    padding-right: max(12px, env(safe-area-inset-right));
-  }
-
-  .logo {
-    font-size: 16px;
-  }
-
   .app-nav {
     position: fixed;
     left: 0;

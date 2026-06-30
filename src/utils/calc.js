@@ -1,4 +1,4 @@
-import { ACCEPTANCE_STATUS, WARNING_STATUS, OVERALL_BUDGET } from '../constants'
+import { ACCEPTANCE_STATUS, WARNING_STATUS, OVERALL_BUDGET, LABOR_BUDGET_CATEGORY } from '../constants'
 import { addDays, diffDaysInclusive, todayStr, daysBetween } from './date'
 
 export function calcConstructionDays(startDate, endDate) {
@@ -19,23 +19,30 @@ export function calcWarningStatus(latestOrderDate, currentDate = todayStr()) {
   return WARNING_STATUS.NORMAL
 }
 
+export function isLaborBudgetItem(item) {
+  return item?.category === LABOR_BUDGET_CATEGORY
+}
+
+/** 计入明细总预算的计划金额（人工类不计入） */
+export function calcBudgetItemPlanningAmount(item) {
+  if (isLaborBudgetItem(item)) return 0
+  return calcBudgetItemTotal(item.unitPrice, item.quantity)
+}
+
 export function calcBudgetItemTotal(unitPrice, quantity) {
   return Number(unitPrice || 0) * Number(quantity || 0)
 }
 
-/** 预算金额或实际费用大于 0，或杂项初始化项时在预算管理页展示 */
+/** 预算金额或实际费用大于 0，或杂项/人工项时在预算管理页展示 */
 export function isBudgetItemVisible(item) {
-  if (item.miscInit) return true
-  const budget = calcBudgetItemTotal(item.unitPrice, item.quantity)
+  if (item.miscInit || isLaborBudgetItem(item)) return true
+  const budget = calcBudgetItemPlanningAmount(item)
   const actual = Number(item.actualAmount || 0)
   return budget > 0 || actual > 0
 }
 
 export function calcBudgetSummary(budgets, overallBudget = OVERALL_BUDGET) {
-  const totalBudget = budgets.reduce(
-    (sum, item) => sum + calcBudgetItemTotal(item.unitPrice, item.quantity),
-    0
-  )
+  const totalBudget = budgets.reduce((sum, item) => sum + calcBudgetItemPlanningAmount(item), 0)
   const totalActual = budgets.reduce((sum, item) => sum + Number(item.actualAmount || 0), 0)
   const totalPaid = budgets.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0)
   const variance = totalBudget - totalPaid
@@ -55,7 +62,7 @@ export function calcBudgetSummary(budgets, overallBudget = OVERALL_BUDGET) {
 }
 
 export function calcBudgetItemVariance(item) {
-  const budget = calcBudgetItemTotal(item.unitPrice, item.quantity)
+  const budget = calcBudgetItemPlanningAmount(item)
   const actual = Number(item.actualAmount || 0)
   const paid = Number(item.paidAmount || 0)
   return {
@@ -72,7 +79,7 @@ export function calcBudgetCategoryStats(budgets, categories) {
       category,
       amount: budgets
         .filter((item) => item.category === category)
-        .reduce((sum, item) => sum + calcBudgetItemTotal(item.unitPrice, item.quantity), 0),
+        .reduce((sum, item) => sum + calcBudgetItemPlanningAmount(item), 0),
     }))
     .filter((item) => item.amount > 0)
 }

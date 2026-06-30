@@ -16,7 +16,7 @@
           <div class="overall-budget-main">
             <div class="card-label">装修总预算</div>
             <div class="card-value primary">¥ {{ formatMoney(visibleBudgetSummary.overallBudget) }}</div>
-            <div class="card-sub">上限 18 万</div>
+            <div class="card-sub">上限 ¥ {{ formatMoney(overallBudget) }}</div>
           </div>
           <div>
             <div class="card-label">已支付</div>
@@ -92,7 +92,12 @@
             <div class="category-head-main">
               <h4 class="category-title">{{ group.category }}</h4>
               <span class="category-meta">
-                {{ group.count }} 项 · 预算 ¥ {{ formatMoney(group.budgetTotal) }} · 已支付 ¥ {{ formatMoney(group.paidTotal) }}
+                <template v-if="isLaborCategory(group.category)">
+                  {{ group.count }} 项 · 已支付 ¥ {{ formatMoney(group.paidTotal) }} · 不做预算预估
+                </template>
+                <template v-else>
+                  {{ group.count }} 项 · 预算 ¥ {{ formatMoney(group.budgetTotal) }} · 已支付 ¥ {{ formatMoney(group.paidTotal) }}
+                </template>
               </span>
             </div>
           </div>
@@ -118,7 +123,17 @@
               <span class="note-label">备注</span>
               <p class="note-text">{{ item.note }}</p>
             </div>
-            <div class="budget-compare">
+            <div v-if="isLaborBudgetItem(item)" class="budget-compare budget-compare-labor">
+              <div class="compare-item">
+                <span class="compare-label">实际费用</span>
+                <span class="compare-value">¥ {{ formatMoney(item.actualAmount) }}</span>
+              </div>
+              <div class="compare-item">
+                <span class="compare-label">已支付</span>
+                <span class="compare-value">¥ {{ formatMoney(item.paidAmount) }}</span>
+              </div>
+            </div>
+            <div v-else class="budget-compare">
               <div class="compare-item">
                 <span class="compare-label">预算</span>
                 <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
@@ -134,7 +149,7 @@
                 </span>
               </div>
             </div>
-            <div class="budget-detail-panel">
+            <div v-if="!isLaborBudgetItem(item)" class="budget-detail-panel">
               <div class="detail-row">
                 <span class="detail-label">单价</span>
                 <span class="detail-value">¥ {{ formatMoney(item.unitPrice) }}</span>
@@ -194,27 +209,30 @@
             placeholder="填写备注或注意事项"
           />
         </el-form-item>
-        <el-form-item label="预算单价" required>
-          <el-input-number
-            v-model="form.unitPrice"
-            :min="0"
-            :precision="2"
-            controls-position="right"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="数量" required>
-          <el-input-number
-            v-model="form.quantity"
-            :min="0"
-            :precision="2"
-            controls-position="right"
-            style="width: 100%"
-          />
-        </el-form-item>
-        <el-form-item label="预算金额">
-          <span class="readonly-value">¥ {{ formatMoney(calcBudgetItemTotal(form.unitPrice, form.quantity)) }}</span>
-        </el-form-item>
+        <template v-if="!isLaborForm">
+          <el-form-item label="预算单价" required>
+            <el-input-number
+              v-model="form.unitPrice"
+              :min="0"
+              :precision="2"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="数量" required>
+            <el-input-number
+              v-model="form.quantity"
+              :min="0"
+              :precision="2"
+              controls-position="right"
+              style="width: 100%"
+            />
+          </el-form-item>
+          <el-form-item label="预算金额">
+            <span class="readonly-value">¥ {{ formatMoney(calcBudgetItemTotal(form.unitPrice, form.quantity)) }}</span>
+          </el-form-item>
+        </template>
+        <p v-else class="labor-form-tip">人工类仅记录实际支出，不填写预算单价。</p>
         <el-form-item label="实际费用">
           <el-input-number
             v-if="!form.procurementLinked"
@@ -247,8 +265,16 @@
 <script setup>
 import { ref, reactive, computed } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { BUDGET_CATEGORIES, MANUAL_BUDGET_CATEGORIES, COLORS } from '../constants'
-import { calcBudgetItemTotal, calcBudgetCategoryActualStats, calcBudgetItemVariance, calcBudgetSummary, isBudgetItemVisible } from '../utils/calc'
+import { BUDGET_CATEGORIES, MANUAL_BUDGET_CATEGORIES, COLORS, LABOR_BUDGET_CATEGORY, OVERALL_BUDGET } from '../constants'
+import {
+  calcBudgetItemTotal,
+  calcBudgetCategoryActualStats,
+  calcBudgetItemVariance,
+  calcBudgetSummary,
+  calcBudgetItemPlanningAmount,
+  isBudgetItemVisible,
+  isLaborBudgetItem,
+} from '../utils/calc'
 import { formatMoney, formatVariance } from '../utils/format'
 import { getProcurementBudgetSource, getProcurementSyncLabel } from '../utils/materialBudgetSync'
 import { useAppStore } from '../composables/useAppStore'
@@ -271,11 +297,15 @@ const CATEGORY_COLORS = {
   杂项: COLORS.info,
 }
 
-const { state, pendingTodoCount, addBudget, updateBudget, deleteBudget } = useAppStore()
+const { state, pendingTodoCount, overallBudget, addBudget, updateBudget, deleteBudget } = useAppStore()
 
 const visibleBudgets = computed(() => state.budgets.filter(isBudgetItemVisible))
 
-const visibleBudgetSummary = computed(() => calcBudgetSummary(visibleBudgets.value))
+const visibleBudgetSummary = computed(() =>
+  calcBudgetSummary(visibleBudgets.value, overallBudget.value || OVERALL_BUDGET)
+)
+
+const isLaborForm = computed(() => form.category === LABOR_BUDGET_CATEGORY)
 
 const overallPaidPercent = computed(() => {
   const total = visibleBudgetSummary.value.overallBudget || 1
@@ -298,10 +328,7 @@ const budgetDetailGroups = computed(() =>
   BUDGET_CATEGORIES.map((category) => {
     const items = visibleBudgets.value.filter((item) => item.category === category)
     if (!items.length) return null
-    const budgetTotal = items.reduce(
-      (sum, item) => sum + calcBudgetItemTotal(item.unitPrice, item.quantity),
-      0
-    )
+    const budgetTotal = items.reduce((sum, item) => sum + calcBudgetItemPlanningAmount(item), 0)
     const paidTotal = items.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0)
     return {
       category,
@@ -326,6 +353,10 @@ const form = reactive({
   procurementLinked: false,
   procurementPage: '',
 })
+
+function isLaborCategory(category) {
+  return category === LABOR_BUDGET_CATEGORY
+}
 
 function varianceClass(val) {
   const num = Number(val || 0)
@@ -389,13 +420,15 @@ function validateForm() {
     ElMessage.warning('请完善必填信息')
     return false
   }
-  if (form.unitPrice === null || form.unitPrice === undefined || form.unitPrice < 0) {
-    ElMessage.warning('请完善必填信息')
-    return false
-  }
-  if (form.quantity === null || form.quantity === undefined || form.quantity <= 0) {
-    ElMessage.warning('请完善必填信息')
-    return false
+  if (!isLaborForm.value) {
+    if (form.unitPrice === null || form.unitPrice === undefined || form.unitPrice < 0) {
+      ElMessage.warning('请完善必填信息')
+      return false
+    }
+    if (form.quantity === null || form.quantity === undefined || form.quantity <= 0) {
+      ElMessage.warning('请完善必填信息')
+      return false
+    }
   }
   if (form.actualAmount === null || form.actualAmount === undefined || form.actualAmount < 0) {
     ElMessage.warning('请完善必填信息')
@@ -414,8 +447,8 @@ function submit() {
     category: form.category,
     name: form.name.trim(),
     note: form.note || '',
-    unitPrice: Number(form.unitPrice),
-    quantity: Number(form.quantity),
+    unitPrice: isLaborForm.value ? 0 : Number(form.unitPrice),
+    quantity: isLaborForm.value ? 1 : Number(form.quantity),
     actualAmount: Number(form.actualAmount),
     paidAmount: Number(form.paidAmount),
   }
@@ -561,6 +594,15 @@ function remove(id) {
   padding: 10px;
   background: #f5f7fa;
   border-radius: 6px;
+}
+.budget-compare-labor {
+  grid-template-columns: repeat(2, 1fr);
+}
+.labor-form-tip {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.5;
 }
 .compare-item {
   display: flex;

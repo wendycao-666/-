@@ -7,6 +7,8 @@
       @select="onWarningSelect"
     />
 
+    <PhaseProcurementPanel @select="onPhaseItemSelect" />
+
     <section v-if="warningFilter" ref="filterSectionRef" class="warning-filter-view">
       <div class="filter-toolbar">
         <span class="filter-title">「{{ warningFilter }}」共 {{ warningFilterItems.length }} 项</span>
@@ -66,6 +68,7 @@ import { listProcurementWarningItems, resolveWarningFilterFromQuery, warningFilt
 import MaterialSection from '../components/MaterialSection.vue'
 import ProcurementSection from '../components/ProcurementSection.vue'
 import ProcurementWarningBar from '../components/ProcurementWarningBar.vue'
+import PhaseProcurementPanel from '../components/PhaseProcurementPanel.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -195,6 +198,32 @@ function applyWarningFilterFromQuery() {
   }
   warningFilter.value = status
   scrollToFilterSection()
+}
+
+function onPhaseItemSelect(entry) {
+  if (warningFilter.value) {
+    clearWarningFilter()
+  }
+
+  if (entry.type === 'material') {
+    activeTab.value = 'material'
+    materialHighlightId.value = entry.item.id
+    procurementHighlightId.value = ''
+  } else {
+    activeTab.value = entry.listKey
+    procurementHighlightId.value = entry.item.id
+    materialHighlightId.value = ''
+  }
+
+  const nextQuery = { ...route.query, tab: entry.tab }
+  delete nextQuery.warning
+  router.replace({ query: nextQuery })
+
+  nextTick(() => {
+    const anchorId =
+      entry.type === 'material' ? `material-${entry.item.id}` : `procurement-${entry.item.id}`
+    document.getElementById(anchorId)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  })
 }
 
 function onWarningSelect(status) {

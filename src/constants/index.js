@@ -4,7 +4,7 @@ export const STORAGE_KEY = 'decoration_tool_data'
 export const SCHEDULE_VERSION = 2
 
 /** 数据结构版本：升级后自动补全采购等字段并写回本地/云端 */
-export const DATA_VERSION = 8
+export const DATA_VERSION = 12
 
 /** 计划开工日 */
 export const PROJECT_START_DATE = '2026-07-13'
@@ -244,6 +244,9 @@ export const MANUAL_BUDGET_CATEGORIES = [
   ...PROCUREMENT_CATEGORIES.map((item) => item.budgetCategory),
   '杂项',
 ]
+
+/** 人工类：仅记录实际支出，不做预算单价预估 */
+export const LABOR_BUDGET_CATEGORY = '人工'
 
 /** 整体装修预算上限（元） */
 export const OVERALL_BUDGET = 180000

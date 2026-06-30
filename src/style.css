@@ -124,7 +124,8 @@ body {
 }
 
 .house-name,
-.house-area {
+.house-area,
+.house-budget {
   margin: 4px 0;
   font-size: 14px;
   color: #606266;

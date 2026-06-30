@@ -15,6 +15,8 @@ import {
   PROJECT_START_DATE,
   SCHEDULE_VERSION,
   DATA_VERSION,
+  LABOR_BUDGET_CATEGORY,
+  OVERALL_BUDGET,
 } from '../constants'
 import { loadData, saveData } from '../utils/storage'
 import { todayStr } from '../utils/date'
@@ -189,8 +191,28 @@ function normalizeBudgets(budgets) {
     if (next.actualAmount === undefined || next.actualAmount === null) {
       next.actualAmount = Number(item.paidAmount || 0)
     }
+    if (next.category === LABOR_BUDGET_CATEGORY) {
+      next.unitPrice = 0
+      next.quantity = 1
+      delete next.laborInit
+      delete next.processName
+      delete next.paymentRatio
+    }
     return next
   })
+}
+
+function sanitizeLaborBudgets(budgets) {
+  const filtered = budgets.filter((item) => !item.laborInit)
+  return {
+    budgets: normalizeBudgets(filtered),
+    removedTemplates: filtered.length !== budgets.length,
+  }
+}
+
+function applyLaborBudgetPayload(item) {
+  if (item.category !== LABOR_BUDGET_CATEGORY) return item
+  return { ...item, unitPrice: 0, quantity: 1 }
 }
 
 function createDefaultState() {
@@ -198,7 +220,7 @@ function createDefaultState() {
   const materials = refreshAllMaterials(createDefaultMaterials(), processes)
   const procurementLists = refreshAllProcurementLists(createDefaultProcurementLists(), processes)
   return {
-    house: { area: '', address: '' },
+    house: { area: '', address: '', overallBudget: OVERALL_BUDGET },
     processes,
     materials,
     procurementLists,
@@ -374,7 +396,11 @@ function applySavedData(saved) {
   if (!saved) return false
   let migrated = !saved.dataVersion || saved.dataVersion < DATA_VERSION
 
-  Object.assign(state.house, saved.house || { area: '', address: '' })
+  Object.assign(state.house, saved.house || { area: '', address: '', overallBudget: OVERALL_BUDGET })
+  if (!state.house.overallBudget) {
+    state.house.overallBudget = OVERALL_BUDGET
+    migrated = true
+  }
   state.processes = saved.processes || createDefaultProcesses()
   if (!saved.scheduleVersion || saved.scheduleVersion < SCHEDULE_VERSION) {
     state.processes = applyScheduleToProcesses(state.processes)
@@ -417,6 +443,14 @@ function applySavedData(saved) {
   if (mergedBudgets !== state.budgets || miscSourceLists) {
     state.budgets = mergedBudgets
     if (!saved.dataVersion || saved.dataVersion < 5) migrated = true
+  }
+  const laborSanitized = sanitizeLaborBudgets(state.budgets)
+  const hadLaborPrices = (saved.budgets || []).some(
+    (item) => item.category === LABOR_BUDGET_CATEGORY && Number(item.unitPrice || 0) > 0
+  )
+  if (!saved.dataVersion || saved.dataVersion < 11 || laborSanitized.removedTemplates || hadLaborPrices) {
+    state.budgets = laborSanitized.budgets
+    migrated = true
   }
   state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
   if (!saved.dataVersion || saved.dataVersion < 7) {
@@ -589,7 +623,8 @@ function recalcMaterialsForProcess(processName) {
 
 export function useAppStore() {
   const progress = computed(() => calcProgress(state.processes))
-  const budgetSummary = computed(() => calcBudgetSummary(state.budgets))
+  const overallBudget = computed(() => Number(state.house.overallBudget) || OVERALL_BUDGET)
+  const budgetSummary = computed(() => calcBudgetSummary(state.budgets, overallBudget.value))
   const materialStats = computed(() => calcMaterialStats(state.materials))
   const procurementWarningStats = computed(() =>
     calcProcurementWarningStats(state.materials, state.procurementLists)
@@ -641,6 +676,9 @@ export function useAppStore() {
   function updateHouse(data) {
     state.house.area = data.area
     state.house.address = data.address
+    if (data.overallBudget !== undefined) {
+      state.house.overallBudget = Number(data.overallBudget) || OVERALL_BUDGET
+    }
     persist()
   }
 
@@ -741,15 +779,16 @@ export function useAppStore() {
   }
 
   function addBudget(item) {
+    const payload = applyLaborBudgetPayload(item)
     state.budgets.unshift({
       id: crypto.randomUUID(),
-      category: item.category,
-      name: item.name,
-      note: item.note || '',
-      unitPrice: item.unitPrice,
-      quantity: item.quantity,
-      actualAmount: item.actualAmount ?? 0,
-      paidAmount: item.paidAmount,
+      category: payload.category,
+      name: payload.name,
+      note: payload.note || '',
+      unitPrice: payload.unitPrice,
+      quantity: payload.quantity,
+      actualAmount: payload.actualAmount ?? 0,
+      paidAmount: payload.paidAmount,
     })
     persist()
   }
@@ -757,7 +796,7 @@ export function useAppStore() {
   function updateBudget(id, item) {
     const budget = state.budgets.find((b) => b.id === id)
     if (!budget) return
-    const payload = { ...item }
+    let payload = applyLaborBudgetPayload({ ...item })
     const procurementItem = findProcurementItemByBudget(budget, state)
     if (procurementItem) {
       syncBudgetToProcurement({ ...budget, ...payload }, procurementItem)
@@ -789,6 +828,7 @@ export function useAppStore() {
     state,
     syncMeta,
     progress,
+    overallBudget,
     budgetSummary,
     materialStats,
     procurementWarningStats,

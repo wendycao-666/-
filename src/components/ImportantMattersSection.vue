@@ -79,6 +79,7 @@ import { ArrowRight, WarningFilled, Clock, Wallet } from '@element-plus/icons-vu
 import { ROUTES, TODO_EMPTY_TEXT, TODO_STATUS, WARNING_STATUS } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
 import { warningFilterToQuery } from '../utils/procurementWarning'
+import { formatMoney } from '../utils/format'
 import EmptyState from './EmptyState.vue'
 
 const router = useRouter()
@@ -122,7 +123,7 @@ const alertItems = computed(() => {
       level: 'danger',
       icon: Wallet,
       title: '整体预算已超支',
-      desc: '已支付金额超过整体预算 18 万',
+      desc: `已支付金额超过整体预算 ¥ ${formatMoney(budgetSummary.value.overallBudget)}`,
       action: () => {},
     })
   }
