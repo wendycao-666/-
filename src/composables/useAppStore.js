@@ -2,8 +2,11 @@ import { reactive, computed } from 'vue'
 import {
   PROCESS_NAMES,
   MATERIAL_TEMPLATES,
-  SOFT_FURNISHING_TEMPLATES,
-  APPLIANCE_TEMPLATES,
+  SEMI_PACKAGE_AUXILIARY_MATERIALS,
+  PROCUREMENT_CATEGORIES,
+  PROCUREMENT_CATEGORY_TEMPLATES,
+  PROCUREMENT_ORDER_RULES,
+  MISC_BUDGET_TEMPLATES,
   ACCEPTANCE_STATUS,
   ACCEPTANCE_RESULT,
   PURCHASE_STATUS,
@@ -19,10 +22,12 @@ import { buildProcessSchedule } from '../utils/workday'
 import {
   calcConstructionDays,
   refreshAllMaterials,
+  refreshAllProcurementLists,
   calcBudgetSummary,
   calcProgress,
   calcMaterialStats,
 } from '../utils/calc'
+import { calcProcurementWarningStats } from '../utils/procurementWarning'
 import {
   syncAllProcurementBudgets,
   syncBudgetToProcurement,
@@ -69,6 +74,7 @@ function createDefaultMaterials() {
     name: item.name,
     processName: item.processName,
     advanceDays: item.advanceDays,
+    note: item.note || '',
     actualOrderDate: '',
     expectedArrivalDate: '',
     unitPrice: 0,
@@ -81,10 +87,25 @@ function createDefaultMaterials() {
   }))
 }
 
-function createDefaultProcurementItems(templates, prefix) {
-  return templates.map((item, index) => ({
+function alignMaterialsWithTemplates(savedMaterials) {
+  const defaults = createDefaultMaterials()
+  if (!Array.isArray(savedMaterials) || savedMaterials.length === 0) return defaults
+  const byName = Object.fromEntries(savedMaterials.map((item) => [item.name, item]))
+  return defaults.map((def) => {
+    const matched = byName[def.name]
+    if (!matched) return { ...def }
+    return { ...def, ...matched, name: def.name }
+  })
+}
+
+function buildProcurementItemDefaults(template, prefix, index) {
+  const rule = PROCUREMENT_ORDER_RULES[template.name] || {}
+  return {
     id: `${prefix}-${index + 1}`,
-    name: item.name,
+    name: template.name,
+    note: template.note || '',
+    processName: rule.processName || '',
+    advanceDays: rule.advanceDays ?? 0,
     actualOrderDate: '',
     expectedArrivalDate: '',
     unitPrice: 0,
@@ -92,19 +113,71 @@ function createDefaultProcurementItems(templates, prefix) {
     cost: 0,
     paidAmount: 0,
     purchaseStatus: PURCHASE_STATUS.PENDING,
+    latestOrderDate: '',
+    warningStatus: '正常',
+  }
+}
+
+function createDefaultProcurementItems(templates, prefix) {
+  return templates.map((item, index) => buildProcurementItemDefaults(item, prefix, index))
+}
+
+function createDefaultProcurementLists() {
+  return Object.fromEntries(
+    PROCUREMENT_CATEGORIES.map(({ key }) => [
+      key,
+      createDefaultProcurementItems(PROCUREMENT_CATEGORY_TEMPLATES[key] || [], key),
+    ])
+  )
+}
+
+function loadProcurementLists(saved) {
+  const defaults = createDefaultProcurementLists()
+  let migrated = !saved?.procurementLists
+
+  if (saved?.procurementLists) {
+    PROCUREMENT_CATEGORIES.forEach(({ key }) => {
+      const merged = mergeProcurementLists(saved.procurementLists[key], defaults[key])
+      defaults[key] = merged.items
+      migrated = migrated || merged.migrated
+    })
+  }
+
+  if (saved?.softFurnishings?.length) {
+    const merged = mergeProcurementLists(saved.softFurnishings, defaults.soft)
+    defaults.soft = merged.items
+    migrated = true
+  }
+
+  if (saved?.appliances?.length) {
+    const merged = mergeProcurementLists(saved.appliances, defaults.appliance)
+    defaults.appliance = merged.items
+    migrated = true
+  }
+
+  if (!saved?.procurementLists && !saved?.softFurnishings?.length && !saved?.appliances?.length) {
+    migrated = true
+  }
+
+  return { lists: defaults, migrated }
+}
+
+function createDefaultMiscBudgets() {
+  return MISC_BUDGET_TEMPLATES.map((item, index) => ({
+    id: `misc-init-${index + 1}`,
+    category: '杂项',
+    name: item.name,
+    note: item.note || '',
+    unitPrice: 0,
+    quantity: 1,
+    actualAmount: 0,
+    paidAmount: 0,
+    miscInit: true,
   }))
 }
 
-function createDefaultSoftFurnishings() {
-  return createDefaultProcurementItems(SOFT_FURNISHING_TEMPLATES, 'soft')
-}
-
-function createDefaultAppliances() {
-  return createDefaultProcurementItems(APPLIANCE_TEMPLATES, 'appliance')
-}
-
 function createDefaultBudgets() {
-  return []
+  return createDefaultMiscBudgets()
 }
 
 function normalizeBudgets(budgets) {
@@ -123,12 +196,12 @@ function normalizeBudgets(budgets) {
 function createDefaultState() {
   const processes = createDefaultProcesses()
   const materials = refreshAllMaterials(createDefaultMaterials(), processes)
+  const procurementLists = refreshAllProcurementLists(createDefaultProcurementLists(), processes)
   return {
     house: { area: '', address: '' },
     processes,
     materials,
-    softFurnishings: createDefaultSoftFurnishings(),
-    appliances: createDefaultAppliances(),
+    procurementLists,
     acceptances: [],
     todos: [],
     budgets: createDefaultBudgets(),
@@ -155,8 +228,9 @@ function serializeState() {
     house: { ...state.house },
     processes: state.processes.map((p) => ({ ...p })),
     materials: state.materials.map((m) => ({ ...m })),
-    softFurnishings: state.softFurnishings.map((item) => ({ ...item })),
-    appliances: state.appliances.map((item) => ({ ...item })),
+    procurementLists: Object.fromEntries(
+      Object.entries(state.procurementLists).map(([key, items]) => [key, items.map((item) => ({ ...item }))])
+    ),
     acceptances: state.acceptances.map((a) => ({
       ...a,
       images: [...a.images],
@@ -179,9 +253,121 @@ function mergeProcurementLists(saved, defaults) {
       migrated = true
       return { ...def }
     }
-    return { ...def, ...matched, name: def.name }
+    if (matched.note === undefined) migrated = true
+    if (!matched.processName && def.processName) migrated = true
+    return {
+      ...def,
+      ...matched,
+      name: def.name,
+      note: matched.note ?? def.note ?? '',
+      processName: def.processName,
+      advanceDays: def.advanceDays,
+    }
   })
   return { items, migrated }
+}
+
+function collectSavedProcurementByName(savedLists) {
+  const byName = {}
+  if (!savedLists) return byName
+  Object.values(savedLists).forEach((items) => {
+    if (!Array.isArray(items)) return
+    items.forEach((item) => {
+      byName[item.name] = item
+    })
+  })
+  return byName
+}
+
+function migrateProcurementListsV4(savedLists) {
+  const defaults = createDefaultProcurementLists()
+  const savedByName = collectSavedProcurementByName(savedLists)
+  const lists = {}
+
+  PROCUREMENT_CATEGORIES.forEach(({ key }) => {
+    const defaultItems = defaults[key] || []
+    const savedItems = defaultItems.map((def) => savedByName[def.name]).filter(Boolean)
+    lists[key] = mergeProcurementLists(savedItems, defaultItems).items
+  })
+
+  return lists
+}
+
+const BUDGET_CATEGORY_MIGRATION_V4 = {
+  厨房: '厨电',
+  卫浴: '卫浴洁具',
+  客厅: '家电',
+  阳台: '家电',
+}
+
+const PROCUREMENT_KEY_MIGRATION_V4 = {
+  living: 'appliance',
+  balcony: 'appliance',
+}
+
+function migrateBudgetsV4(budgets, procurementLists) {
+  const itemKeyById = {}
+  Object.entries(procurementLists).forEach(([key, items]) => {
+    items.forEach((item) => {
+      itemKeyById[item.id] = key
+    })
+  })
+
+  return budgets.map((budget) => {
+    const next = { ...budget }
+    if (BUDGET_CATEGORY_MIGRATION_V4[next.category]) {
+      next.category = BUDGET_CATEGORY_MIGRATION_V4[next.category]
+    }
+    if (next.procurementKey && PROCUREMENT_KEY_MIGRATION_V4[next.procurementKey]) {
+      next.procurementKey = PROCUREMENT_KEY_MIGRATION_V4[next.procurementKey]
+    }
+    if (next.procurementId && itemKeyById[next.procurementId]) {
+      next.procurementKey = itemKeyById[next.procurementId]
+    }
+    return next
+  })
+}
+
+const NON_PROCUREMENT_NAMES = new Set(MISC_BUDGET_TEMPLATES.map((item) => item.name))
+
+function mergeMiscBudgetInit(budgets, savedLists) {
+  const procByName = savedLists ? collectSavedProcurementByName(savedLists) : {}
+  const next = budgets.filter(
+    (budget) => !(budget.procurementKey === 'base' && NON_PROCUREMENT_NAMES.has(budget.name))
+  )
+
+  MISC_BUDGET_TEMPLATES.forEach((template, index) => {
+    const oldProc = procByName[template.name]
+    let budget = next.find((item) => item.category === '杂项' && item.name === template.name)
+
+    if (budget) {
+      budget.miscInit = true
+      budget.note = budget.note || template.note || ''
+      if (oldProc) {
+        if (Number(oldProc.unitPrice || 0) > 0) budget.unitPrice = Number(oldProc.unitPrice)
+        if (Number(oldProc.cost || 0) > 0) budget.actualAmount = Number(oldProc.cost)
+        if (Number(oldProc.paidAmount || 0) > 0) budget.paidAmount = Number(oldProc.paidAmount)
+        if (oldProc.note) budget.note = oldProc.note
+      }
+      delete budget.procurementKey
+      delete budget.procurementId
+      return
+    }
+
+    next.push({
+      id: `misc-init-${index + 1}`,
+      category: '杂项',
+      name: template.name,
+      note: oldProc?.note || template.note || '',
+      unitPrice: Number(oldProc?.unitPrice || 0),
+      quantity: Number(oldProc?.quantity || 1) || 1,
+      actualAmount: Number(oldProc?.cost || 0),
+      paidAmount: Number(oldProc?.paidAmount || 0),
+      miscInit: true,
+    })
+  })
+
+  return next
 }
 
 function applySavedData(saved) {
@@ -194,16 +380,25 @@ function applySavedData(saved) {
     state.processes = applyScheduleToProcesses(state.processes)
     migrated = true
   }
-  state.materials = refreshAllMaterials(saved.materials || createDefaultMaterials(), state.processes)
-  if (!saved.materials?.length) migrated = true
+  state.materials = refreshAllMaterials(
+    alignMaterialsWithTemplates(saved.materials),
+    state.processes
+  )
+  if (!saved.materials?.length || !saved.dataVersion || saved.dataVersion < 7) migrated = true
 
-  const soft = mergeProcurementLists(saved.softFurnishings, createDefaultSoftFurnishings())
-  state.softFurnishings = soft.items
-  migrated = migrated || soft.migrated
-
-  const appliances = mergeProcurementLists(saved.appliances, createDefaultAppliances())
-  state.appliances = appliances.items
-  migrated = migrated || appliances.migrated
+  const rawSavedLists = saved.procurementLists
+  const procurement = loadProcurementLists(saved)
+  if (!saved.dataVersion || saved.dataVersion < 4) {
+    state.procurementLists = migrateProcurementListsV4(rawSavedLists || procurement.lists)
+    migrated = true
+  } else {
+    state.procurementLists = procurement.lists
+  }
+  state.procurementLists = refreshAllProcurementLists(state.procurementLists, state.processes)
+  if (!saved.dataVersion || saved.dataVersion < DATA_VERSION) {
+    migrated = true
+  }
+  migrated = migrated || procurement.migrated || !saved.dataVersion || saved.dataVersion < DATA_VERSION
 
   state.acceptances = (saved.acceptances || []).map((a) => ({
     ...a,
@@ -211,10 +406,32 @@ function applySavedData(saved) {
   }))
   state.todos = normalizeTodos(saved.todos || [])
   migrateFailAcceptancesToTodos()
+  resyncAllProcessAcceptance()
   state.budgets = saved.budgets?.length ? normalizeBudgets(saved.budgets) : createDefaultBudgets()
+  if (!saved.dataVersion || saved.dataVersion < 4) {
+    state.budgets = migrateBudgetsV4(state.budgets, state.procurementLists)
+    migrated = true
+  }
+  const miscSourceLists = !saved.dataVersion || saved.dataVersion < 5 ? rawSavedLists : null
+  const mergedBudgets = mergeMiscBudgetInit(state.budgets, miscSourceLists)
+  if (mergedBudgets !== state.budgets || miscSourceLists) {
+    state.budgets = mergedBudgets
+    if (!saved.dataVersion || saved.dataVersion < 5) migrated = true
+  }
   state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
-  syncAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
-  cleanupAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
+  if (!saved.dataVersion || saved.dataVersion < 7) {
+    const removedMaterialIds = new Set(
+      (saved.materials || [])
+        .filter((item) => SEMI_PACKAGE_AUXILIARY_MATERIALS.includes(item.name))
+        .map((item) => item.id)
+    )
+    if (removedMaterialIds.size) {
+      state.budgets = state.budgets.filter((budget) => !removedMaterialIds.has(budget.materialId))
+      migrated = true
+    }
+  }
+  syncAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
+  cleanupAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
   return migrated
 }
 
@@ -277,9 +494,14 @@ async function initStore() {
   syncMeta.initialized = true
 }
 
+function refreshProcurementSchedule() {
+  state.materials = refreshAllMaterials(state.materials, state.processes)
+  state.procurementLists = refreshAllProcurementLists(state.procurementLists, state.processes)
+}
+
 function refreshWarningsIfNeeded() {
   const today = todayStr()
-  state.materials = refreshAllMaterials(state.materials, state.processes)
+  refreshProcurementSchedule()
   state.lastWarningRefreshDate = today
   persist()
 }
@@ -349,21 +571,29 @@ function syncProcessAcceptance(processName) {
   const process = state.processes.find((p) => p.name === processName)
   if (!process) return
   const records = state.acceptances.filter((a) => a.processName === processName)
-  if (records.length === 0) {
+  if (!records.length) {
     process.acceptanceStatus = ACCEPTANCE_STATUS.NONE
-  } else if (process.acceptanceStatus !== ACCEPTANCE_STATUS.DONE) {
-    process.acceptanceStatus = ACCEPTANCE_STATUS.PARTIAL
+    return
   }
+  const hasFail = records.some((a) => a.result === ACCEPTANCE_RESULT.FAIL)
+  process.acceptanceStatus = hasFail ? ACCEPTANCE_STATUS.FAIL : ACCEPTANCE_STATUS.DONE
+}
+
+function resyncAllProcessAcceptance() {
+  state.processes.forEach((process) => syncProcessAcceptance(process.name))
 }
 
 function recalcMaterialsForProcess(processName) {
-  state.materials = refreshAllMaterials(state.materials, state.processes)
+  refreshProcurementSchedule()
 }
 
 export function useAppStore() {
   const progress = computed(() => calcProgress(state.processes))
   const budgetSummary = computed(() => calcBudgetSummary(state.budgets))
   const materialStats = computed(() => calcMaterialStats(state.materials))
+  const procurementWarningStats = computed(() =>
+    calcProcurementWarningStats(state.materials, state.procurementLists)
+  )
   const shareLink = computed(() => (syncMeta.projectId ? buildShareUrl(syncMeta.projectId) : ''))
   const pendingTodoCount = computed(() => state.todos.filter((t) => isTodoPending(t)).length)
   const todos = computed(() =>
@@ -432,24 +662,26 @@ export function useAppStore() {
     if (!material) return
     Object.assign(material, data)
     state.materials = refreshAllMaterials(state.materials, state.processes)
-    syncAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
+    syncAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
+    persist()
+  }
+
+  function updateProcurementItem(listKey, id, data) {
+    const items = state.procurementLists[listKey]
+    if (!items) return
+    const item = items.find((entry) => entry.id === id)
+    if (!item) return
+    Object.assign(item, data)
+    syncAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
     persist()
   }
 
   function updateSoftFurnishing(id, data) {
-    const item = state.softFurnishings.find((entry) => entry.id === id)
-    if (!item) return
-    Object.assign(item, data)
-    syncAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
-    persist()
+    updateProcurementItem('soft', id, data)
   }
 
   function updateAppliance(id, data) {
-    const item = state.appliances.find((entry) => entry.id === id)
-    if (!item) return
-    Object.assign(item, data)
-    syncAllProcurementBudgets(state.materials, state.softFurnishings, state.appliances, state.budgets)
-    persist()
+    updateProcurementItem('appliance', id, data)
   }
 
   function addAcceptance(record) {
@@ -513,6 +745,7 @@ export function useAppStore() {
       id: crypto.randomUUID(),
       category: item.category,
       name: item.name,
+      note: item.note || '',
       unitPrice: item.unitPrice,
       quantity: item.quantity,
       actualAmount: item.actualAmount ?? 0,
@@ -558,6 +791,7 @@ export function useAppStore() {
     progress,
     budgetSummary,
     materialStats,
+    procurementWarningStats,
     shareLink,
     pendingTodoCount,
     todos,
@@ -568,6 +802,7 @@ export function useAppStore() {
     updateHouse,
     updateProcess,
     updateMaterial,
+    updateProcurementItem,
     updateSoftFurnishing,
     updateAppliance,
     addAcceptance,

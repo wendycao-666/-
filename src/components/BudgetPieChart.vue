@@ -1,6 +1,6 @@
 <template>
   <div class="budget-pie">
-    <div v-if="!segments.length" class="pie-empty">暂无预算数据</div>
+    <div v-if="!segments.length" class="pie-empty">暂无实际支出数据</div>
     <template v-else>
       <svg viewBox="0 0 120 120" class="pie-svg" aria-hidden="true">
         <circle cx="60" cy="60" r="52" fill="#f2f6fc" />
@@ -34,9 +34,7 @@ const props = defineProps({
   },
 })
 
-function formatMoney(val) {
-  return Number(val || 0).toFixed(2)
-}
+import { formatMoney } from '../utils/format'
 
 function polarToCartesian(cx, cy, radius, angleDeg) {
   const rad = ((angleDeg - 90) * Math.PI) / 180

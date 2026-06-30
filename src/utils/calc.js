@@ -1,4 +1,4 @@
-import { ACCEPTANCE_STATUS, WARNING_STATUS } from '../constants'
+import { ACCEPTANCE_STATUS, WARNING_STATUS, OVERALL_BUDGET } from '../constants'
 import { addDays, diffDaysInclusive, todayStr, daysBetween } from './date'
 
 export function calcConstructionDays(startDate, endDate) {
@@ -23,14 +23,15 @@ export function calcBudgetItemTotal(unitPrice, quantity) {
   return Number(unitPrice || 0) * Number(quantity || 0)
 }
 
-/** 预算金额或实际费用任一大于 0 时在预算管理页展示 */
+/** 预算金额或实际费用大于 0，或杂项初始化项时在预算管理页展示 */
 export function isBudgetItemVisible(item) {
+  if (item.miscInit) return true
   const budget = calcBudgetItemTotal(item.unitPrice, item.quantity)
   const actual = Number(item.actualAmount || 0)
   return budget > 0 || actual > 0
 }
 
-export function calcBudgetSummary(budgets) {
+export function calcBudgetSummary(budgets, overallBudget = OVERALL_BUDGET) {
   const totalBudget = budgets.reduce(
     (sum, item) => sum + calcBudgetItemTotal(item.unitPrice, item.quantity),
     0
@@ -38,6 +39,7 @@ export function calcBudgetSummary(budgets) {
   const totalActual = budgets.reduce((sum, item) => sum + Number(item.actualAmount || 0), 0)
   const totalPaid = budgets.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0)
   const variance = totalBudget - totalPaid
+  const overallRemaining = overallBudget - totalPaid
   return {
     totalBudget,
     totalActual,
@@ -45,7 +47,10 @@ export function calcBudgetSummary(budgets) {
     variance,
     remaining: totalBudget - totalPaid,
     unpaid: totalBudget - totalPaid,
+    overallBudget,
+    overallRemaining,
     isOverBudget: totalPaid > totalBudget,
+    isOverOverallBudget: totalPaid > overallBudget,
   }
 }
 
@@ -68,6 +73,25 @@ export function calcBudgetCategoryStats(budgets, categories) {
       amount: budgets
         .filter((item) => item.category === category)
         .reduce((sum, item) => sum + calcBudgetItemTotal(item.unitPrice, item.quantity), 0),
+    }))
+    .filter((item) => item.amount > 0)
+}
+
+/** 单项实际支出：优先已支付，否则取实际费用 */
+export function getBudgetItemActualSpend(item) {
+  const paid = Number(item.paidAmount || 0)
+  if (paid > 0) return paid
+  return Number(item.actualAmount || 0)
+}
+
+/** 分类实际支出统计（用于占比图） */
+export function calcBudgetCategoryActualStats(budgets, categories) {
+  return categories
+    .map((category) => ({
+      category,
+      amount: budgets
+        .filter((item) => item.category === category)
+        .reduce((sum, item) => sum + getBudgetItemActualSpend(item), 0),
     }))
     .filter((item) => item.amount > 0)
 }
@@ -186,4 +210,19 @@ export function refreshMaterialFields(material, processMap) {
 export function refreshAllMaterials(materials, processes) {
   const processMap = Object.fromEntries(processes.map((p) => [p.name, p]))
   return materials.map((m) => refreshMaterialFields(m, processMap))
+}
+
+export function refreshAllProcurementLists(procurementLists, processes) {
+  const processMap = Object.fromEntries(processes.map((p) => [p.name, p]))
+  return Object.fromEntries(
+    Object.entries(procurementLists).map(([key, items]) => [
+      key,
+      items.map((item) => {
+        if (!item.processName) {
+          return { ...item, latestOrderDate: '', warningStatus: WARNING_STATUS.NORMAL }
+        }
+        return refreshMaterialFields(item, processMap)
+      }),
+    ])
+  )
 }

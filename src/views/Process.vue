@@ -1,6 +1,5 @@
 <template>
   <div class="page process-page">
-    <h2 class="page-title">工序</h2>
 
     <el-tabs v-model="activeTab" class="process-tabs">
       <el-tab-pane label="进度" name="schedule">
@@ -124,17 +123,8 @@
       </div>
       <p v-if="process.note" class="process-note">备注：{{ process.note }}</p>
       <div class="process-actions">
-        <el-select
-          v-model="process.acceptanceStatus"
-          size="small"
-          style="width: 120px"
-          @change="(val) => onStatusChange(process.id, val)"
-        >
-          <el-option label="未验收" :value="ACCEPTANCE_STATUS.NONE" />
-          <el-option label="部分验收" :value="ACCEPTANCE_STATUS.PARTIAL" />
-          <el-option label="已验收" :value="ACCEPTANCE_STATUS.DONE" />
-        </el-select>
-        <el-button type="primary" size="small" round @click="openEdit(process)">编辑</el-button>
+        <el-button type="primary" size="small" round @click="openAcceptance(process.name)">验收</el-button>
+        <el-button size="small" round @click="openEdit(process)">编辑</el-button>
       </div>
     </el-card>
       </el-tab-pane>
@@ -142,6 +132,8 @@
         <AcceptanceSection />
       </el-tab-pane>
     </el-tabs>
+
+    <AcceptanceFormDialog v-model="acceptanceDialogVisible" :process-name="acceptanceProcessName" />
 
     <el-dialog v-model="dialogVisible" title="编辑工序" width="90%" style="max-width: 420px">
       <el-form label-width="90px">
@@ -186,6 +178,7 @@ import { buildSubtaskSchedule } from '../utils/workday'
 import { calcConstructionDays } from '../utils/calc'
 import { todayStr } from '../utils/date'
 import AcceptanceSection from '../components/AcceptanceSection.vue'
+import AcceptanceFormDialog from '../components/AcceptanceFormDialog.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -209,6 +202,8 @@ watch(
 )
 
 const dialogVisible = ref(false)
+const acceptanceDialogVisible = ref(false)
+const acceptanceProcessName = ref('')
 const editingId = ref('')
 const form = reactive({ startDate: '', endDate: '', note: '' })
 
@@ -412,8 +407,13 @@ const ganttGroups = computed(() =>
 
 function statusTagType(status) {
   if (status === ACCEPTANCE_STATUS.DONE) return 'success'
-  if (status === ACCEPTANCE_STATUS.PARTIAL) return 'warning'
+  if (status === ACCEPTANCE_STATUS.FAIL) return 'danger'
   return 'info'
+}
+
+function openAcceptance(processName) {
+  acceptanceProcessName.value = processName
+  acceptanceDialogVisible.value = true
 }
 
 function openEdit(process) {
@@ -439,10 +439,6 @@ function submitEdit() {
     note: form.note,
   })
   dialogVisible.value = false
-}
-
-function onStatusChange(id, val) {
-  updateProcess(id, { acceptanceStatus: val })
 }
 </script>
 
@@ -738,12 +734,8 @@ function onStatusChange(id, val) {
   .process-actions {
     width: 100%;
   }
-  .process-actions .el-select {
-    flex: 1;
-    min-width: 0;
-  }
   .process-actions .el-button {
-    flex-shrink: 0;
+    flex: 1;
   }
 }
 </style>

@@ -76,44 +76,53 @@ import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowRight, WarningFilled, Clock, Wallet } from '@element-plus/icons-vue'
-import { ROUTES, TODO_EMPTY_TEXT, TODO_STATUS } from '../constants'
+import { ROUTES, TODO_EMPTY_TEXT, TODO_STATUS, WARNING_STATUS } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
+import { warningFilterToQuery } from '../utils/procurementWarning'
 import EmptyState from './EmptyState.vue'
 
 const router = useRouter()
-const { todos, materialStats, budgetSummary, completeTodo, reopenTodo } = useAppStore()
+const { todos, procurementWarningStats, budgetSummary, completeTodo, reopenTodo } = useAppStore()
 
 const filter = ref('pending')
 
 const alertItems = computed(() => {
   const items = []
-  if (materialStats.value.overdue > 0) {
+  if (procurementWarningStats.value.overdue > 0) {
     items.push({
       key: 'material-overdue',
       level: 'danger',
       icon: WarningFilled,
-      title: `主材逾期 ${materialStats.value.overdue} 项`,
+      title: `材料采购逾期 ${procurementWarningStats.value.overdue} 项`,
       desc: '请尽快处理采购下单',
-      action: () => router.push({ path: ROUTES.PROCUREMENT, query: { tab: 'material' } }),
+      action: () =>
+        router.push({
+          path: ROUTES.PROCUREMENT,
+          query: { warning: warningFilterToQuery(WARNING_STATUS.OVERDUE) },
+        }),
     })
   }
-  if (materialStats.value.expiring > 0) {
+  if (procurementWarningStats.value.expiring > 0) {
     items.push({
       key: 'material-expiring',
       level: 'warning',
       icon: Clock,
-      title: `主材即将到期 ${materialStats.value.expiring} 项`,
+      title: `材料采购即将到期 ${procurementWarningStats.value.expiring} 项`,
       desc: '建议近期安排下单',
-      action: () => router.push({ path: ROUTES.PROCUREMENT, query: { tab: 'material' } }),
+      action: () =>
+        router.push({
+          path: ROUTES.PROCUREMENT,
+          query: { warning: warningFilterToQuery(WARNING_STATUS.EXPIRING) },
+        }),
     })
   }
-  if (budgetSummary.value.isOverBudget) {
+  if (budgetSummary.value.isOverOverallBudget) {
     items.push({
       key: 'budget-over',
       level: 'danger',
       icon: Wallet,
-      title: '预算已超支',
-      desc: '已支付金额超过总预算',
+      title: '整体预算已超支',
+      desc: '已支付金额超过整体预算 18 万',
       action: () => {},
     })
   }

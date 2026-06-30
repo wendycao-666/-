@@ -40,15 +40,15 @@
 
       <el-card
         class="card-block stat-card-link"
-        :class="{ 'risk-card': materialStats.overdue > 0 }"
+        :class="{ 'risk-card': procurementWarningStats.overdue > 0 }"
         shadow="never"
-        @click="router.push({ path: ROUTES.PROCUREMENT, query: { tab: 'material' } })"
+        @click="router.push(ROUTES.PROCUREMENT)"
       >
-        <div class="card-label">主材预警</div>
+        <div class="card-label">材料采购预警</div>
         <div class="card-row">
-          <span class="danger">逾期 {{ materialStats.overdue }}</span>
-          <span class="warning">即将到期 {{ materialStats.expiring }}</span>
-          <span class="success">正常 {{ materialStats.normal }}</span>
+          <span class="danger">逾期 {{ procurementWarningStats.overdue }}</span>
+          <span class="warning">即将到期 {{ procurementWarningStats.expiring }}</span>
+          <span class="success">正常 {{ procurementWarningStats.normal }}</span>
         </div>
       </el-card>
 
@@ -65,16 +65,18 @@
 
       <el-card
         class="card-block stat-card-link"
-        :class="{ 'risk-card': budgetSummary.isOverBudget }"
+        :class="{ 'risk-card': budgetSummary.isOverOverallBudget }"
         shadow="never"
         @click="router.push(ROUTES.BUDGET)"
       >
         <div class="card-label">预算概况</div>
-        <div class="card-value">¥ {{ formatMoney(budgetSummary.totalBudget) }}</div>
-        <div class="card-sub">
-          实际 ¥ {{ formatMoney(budgetSummary.totalActual) }} · 已支付 ¥ {{ formatMoney(budgetSummary.totalPaid) }}
+        <div class="card-value" :class="{ danger: budgetSummary.overallRemaining < 0, success: budgetSummary.overallRemaining > 0 }">
+          剩余 ¥ {{ formatMoney(budgetSummary.overallRemaining) }}
         </div>
-        <div v-if="budgetSummary.isOverBudget" class="over-budget">已支付超预算</div>
+        <div class="card-sub">
+          整体 ¥ {{ formatMoney(budgetSummary.overallBudget) }} · 已支付 ¥ {{ formatMoney(budgetSummary.totalPaid) }}
+        </div>
+        <div v-if="budgetSummary.isOverOverallBudget" class="over-budget">已支付超过整体预算</div>
       </el-card>
     </div>
 
@@ -99,6 +101,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ROUTES } from '../constants'
+import { formatMoney } from '../utils/format'
 import { useAppStore } from '../composables/useAppStore'
 import { getCurrentProcessInfo } from '../utils/calc'
 
@@ -107,7 +110,7 @@ const {
   state,
   progress,
   budgetSummary,
-  materialStats,
+  procurementWarningStats,
   pendingTodoCount,
   refreshWarningsIfNeeded,
   updateHouse,
@@ -131,10 +134,6 @@ function openHouseDialog() {
 function submitHouse() {
   updateHouse({ area: houseForm.area.trim(), address: houseForm.address.trim() })
   houseDialogVisible.value = false
-}
-
-function formatMoney(val) {
-  return Number(val || 0).toFixed(2)
 }
 </script>
 

@@ -3,12 +3,30 @@
     <el-card
       v-for="item in items"
       :key="item.id"
+      :id="`procurement-${item.id}`"
       class="card-block procurement-card"
+      :class="{ 'procurement-highlight': highlightId === item.id }"
       shadow="never"
     >
       <div class="procurement-head">
         <h3>{{ item.name }}</h3>
-        <el-tag size="small" type="info">{{ categoryLabel }}</el-tag>
+        <div class="procurement-tags">
+          <el-tag v-if="item.warningStatus" :type="warningTagType(item.warningStatus)" size="small">
+            {{ item.warningStatus }}
+          </el-tag>
+          <el-tag size="small" type="info">{{ categoryLabel }}</el-tag>
+        </div>
+      </div>
+
+      <div v-if="item.processName" class="procurement-meta">
+        <span>归属工序：{{ item.processName }}</span>
+        <span>提前 {{ item.advanceDays }} 天采购</span>
+        <span>最晚下单：{{ item.latestOrderDate || '-' }}</span>
+      </div>
+
+      <div v-if="item.note" class="procurement-note">
+        <span class="note-label">注意事项</span>
+        <p class="note-text">{{ item.note }}</p>
       </div>
 
       <div class="budget-compare">
@@ -29,6 +47,15 @@
       </div>
 
       <el-form label-width="100px" class="procurement-form">
+        <el-form-item label="注意事项">
+          <el-input
+            v-model="item.note"
+            type="textarea"
+            :rows="2"
+            placeholder="填写采购注意事项"
+            @change="emitSave(item)"
+          />
+        </el-form-item>
         <el-form-item label="实际下单">
           <el-date-picker
             v-model="item.actualOrderDate"
@@ -106,8 +133,9 @@
 </template>
 
 <script setup>
-import { PURCHASE_STATUS } from '../constants'
+import { PURCHASE_STATUS, WARNING_STATUS } from '../constants'
 import { calcBudgetItemTotal, calcBudgetItemVariance } from '../utils/calc'
+import { formatMoney, formatVariance } from '../utils/format'
 
 defineProps({
   items: {
@@ -117,6 +145,10 @@ defineProps({
   categoryLabel: {
     type: String,
     required: true,
+  },
+  highlightId: {
+    type: String,
+    default: '',
   },
   syncTip: {
     type: String,
@@ -128,17 +160,6 @@ const emit = defineEmits(['save'])
 
 function emitSave(item) {
   emit('save', item)
-}
-
-function formatMoney(val) {
-  return Number(val || 0).toFixed(2)
-}
-
-function formatVariance(val) {
-  const num = Number(val || 0)
-  if (num === 0) return '¥ 0.00'
-  const prefix = num > 0 ? '+' : '-'
-  return `${prefix}¥ ${Math.abs(num).toFixed(2)}`
 }
 
 function varianceClass(val) {
@@ -156,21 +177,68 @@ function getItemVariance(item) {
     paidAmount: item.paidAmount,
   })
 }
+
+function warningTagType(status) {
+  if (status === WARNING_STATUS.OVERDUE) return 'danger'
+  if (status === WARNING_STATUS.EXPIRING) return 'warning'
+  return 'success'
+}
 </script>
 
 <style scoped>
 .procurement-card {
   margin-bottom: 12px;
+  scroll-margin-top: 120px;
+  transition: box-shadow 0.3s;
+}
+.procurement-highlight {
+  box-shadow: 0 0 0 2px #409EFF;
 }
 .procurement-head {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
+  gap: 8px;
   margin-bottom: 8px;
 }
 .procurement-head h3 {
   margin: 0;
   font-size: 16px;
+}
+.procurement-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.procurement-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 13px;
+  color: #606266;
+  margin-bottom: 8px;
+}
+.procurement-note {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: #fdf6ec;
+  border-left: 3px solid #E6A23C;
+  border-radius: 0 6px 6px 0;
+}
+.note-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #E6A23C;
+  margin-bottom: 4px;
+}
+.note-text {
+  margin: 0;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 .budget-compare {
   display: grid;
@@ -215,6 +283,17 @@ function getItemVariance(item) {
   line-height: 1.4;
 }
 @media (max-width: 640px) {
+  .procurement-head {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .procurement-tags {
+    justify-content: flex-start;
+  }
+  .procurement-meta {
+    flex-direction: column;
+    gap: 4px;
+  }
   .budget-compare {
     grid-template-columns: 1fr;
   }

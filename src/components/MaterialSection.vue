@@ -1,41 +1,11 @@
 <template>
   <div class="material-section">
-    <div class="stat-cards compact">
-      <el-card
-        class="card-block stat-card-link"
-        :class="{ active: activeStatus === WARNING_STATUS.OVERDUE }"
-        shadow="never"
-        @click="scrollToStatus(WARNING_STATUS.OVERDUE)"
-      >
-        <div class="card-label danger">逾期</div>
-        <div class="card-value danger">{{ materialStats.overdue }}</div>
-      </el-card>
-      <el-card
-        class="card-block stat-card-link"
-        :class="{ active: activeStatus === WARNING_STATUS.EXPIRING }"
-        shadow="never"
-        @click="scrollToStatus(WARNING_STATUS.EXPIRING)"
-      >
-        <div class="card-label warning">即将到期</div>
-        <div class="card-value warning">{{ materialStats.expiring }}</div>
-      </el-card>
-      <el-card
-        class="card-block stat-card-link"
-        :class="{ active: activeStatus === WARNING_STATUS.NORMAL }"
-        shadow="never"
-        @click="scrollToStatus(WARNING_STATUS.NORMAL)"
-      >
-        <div class="card-label success">正常</div>
-        <div class="card-value success">{{ materialStats.normal }}</div>
-      </el-card>
-    </div>
-
     <el-card
-      v-for="item in state.materials"
+      v-for="item in visibleMaterials"
       :key="item.id"
       :id="`material-${item.id}`"
       class="card-block material-card"
-      :class="{ 'material-highlight': highlightId === item.id }"
+      :class="{ 'material-highlight': props.highlightId === item.id }"
       shadow="never"
     >
       <div class="material-head">
@@ -46,6 +16,11 @@
         <span>归属工序：{{ item.processName }}</span>
         <span>提前 {{ item.advanceDays }} 天采购</span>
         <span>最晚下单：{{ item.latestOrderDate || '-' }}</span>
+      </div>
+
+      <div v-if="item.note" class="material-note">
+        <span class="note-label">注意事项</span>
+        <p class="note-text">{{ item.note }}</p>
       </div>
 
       <div class="budget-compare">
@@ -66,6 +41,15 @@
       </div>
 
       <el-form label-width="100px" class="material-form">
+        <el-form-item label="注意事项">
+          <el-input
+            v-model="item.note"
+            type="textarea"
+            :rows="2"
+            placeholder="填写采购注意事项"
+            @change="saveMaterial(item)"
+          />
+        </el-form-item>
         <el-form-item label="实际下单">
           <el-date-picker
             v-model="item.actualOrderDate"
@@ -143,31 +127,31 @@
 </template>
 
 <script setup>
-import { ref, onMounted, nextTick } from 'vue'
-import { ElMessage } from 'element-plus'
+import { computed } from 'vue'
 import { PURCHASE_STATUS, WARNING_STATUS } from '../constants'
 import { calcBudgetItemTotal, calcBudgetItemVariance } from '../utils/calc'
+import { formatMoney, formatVariance } from '../utils/format'
 import { useAppStore } from '../composables/useAppStore'
 
-const { state, materialStats, refreshWarningsIfNeeded, updateMaterial } = useAppStore()
-
-const activeStatus = ref('')
-const highlightId = ref('')
-
-onMounted(() => {
-  refreshWarningsIfNeeded()
+const props = defineProps({
+  nameOrder: {
+    type: Array,
+    default: null,
+  },
+  highlightId: {
+    type: String,
+    default: '',
+  },
 })
 
-function formatMoney(val) {
-  return Number(val || 0).toFixed(2)
-}
+const { state, updateMaterial } = useAppStore()
 
-function formatVariance(val) {
-  const num = Number(val || 0)
-  if (num === 0) return '¥ 0.00'
-  const prefix = num > 0 ? '+' : '-'
-  return `${prefix}¥ ${Math.abs(num).toFixed(2)}`
-}
+const visibleMaterials = computed(() => {
+  if (!props.nameOrder?.length) return state.materials
+  return props.nameOrder
+    .map((name) => state.materials.find((item) => item.name === name))
+    .filter(Boolean)
+})
 
 function varianceClass(val) {
   const num = Number(val || 0)
@@ -185,28 +169,6 @@ function getItemVariance(item) {
   })
 }
 
-function scrollToStatus(status) {
-  const target = state.materials.find((item) => item.warningStatus === status)
-  if (!target) {
-    ElMessage.info(`暂无「${status}」主材`)
-    return
-  }
-
-  activeStatus.value = status
-  highlightId.value = target.id
-
-  nextTick(() => {
-    document.getElementById(`material-${target.id}`)?.scrollIntoView({
-      behavior: 'smooth',
-      block: 'start',
-    })
-  })
-
-  window.setTimeout(() => {
-    highlightId.value = ''
-  }, 1800)
-}
-
 function warningTagType(status) {
   if (status === WARNING_STATUS.OVERDUE) return 'danger'
   if (status === WARNING_STATUS.EXPIRING) return 'warning'
@@ -222,29 +184,15 @@ function saveMaterial(item) {
     cost: Number(item.cost || 0),
     paidAmount: Number(item.paidAmount || 0),
     purchaseStatus: item.purchaseStatus,
+    note: item.note || '',
   })
 }
 </script>
 
 <style scoped>
-.compact {
-  grid-template-columns: repeat(3, 1fr);
-  margin-bottom: 12px;
-}
-.stat-card-link {
-  cursor: pointer;
-  transition: box-shadow 0.2s, transform 0.2s;
-}
-.stat-card-link:hover {
-  box-shadow: 0 4px 12px rgba(64, 158, 255, 0.15);
-  transform: translateY(-1px);
-}
-.stat-card-link.active {
-  box-shadow: 0 0 0 2px #409EFF inset;
-}
 .material-card {
   margin-bottom: 12px;
-  scroll-margin-top: 88px;
+  scroll-margin-top: 120px;
   transition: box-shadow 0.3s;
 }
 .material-highlight {
@@ -267,6 +215,27 @@ function saveMaterial(item) {
   font-size: 13px;
   color: #606266;
   margin-bottom: 8px;
+}
+.material-note {
+  margin-bottom: 10px;
+  padding: 10px 12px;
+  background: #fdf6ec;
+  border-left: 3px solid #E6A23C;
+  border-radius: 0 6px 6px 0;
+}
+.note-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #E6A23C;
+  margin-bottom: 4px;
+}
+.note-text {
+  margin: 0;
+  font-size: 13px;
+  color: #606266;
+  line-height: 1.5;
+  white-space: pre-wrap;
 }
 .budget-compare {
   display: grid;
@@ -311,9 +280,6 @@ function saveMaterial(item) {
   line-height: 1.4;
 }
 @media (max-width: 640px) {
-  .compact {
-    grid-template-columns: 1fr;
-  }
   .material-head {
     flex-wrap: wrap;
     gap: 6px;
