@@ -13,7 +13,7 @@
       <h3 class="section-title">整体预算</h3>
       <el-card class="card-block overall-budget-card" shadow="never">
         <div class="budget-hero-block">
-          <div class="card-label">剩余预算</div>
+          <div class="card-label">还能花多少</div>
           <div
             class="num-hero"
             :class="overallRemainingClass(visibleBudgetSummary.overallRemaining)"
@@ -21,8 +21,8 @@
             ¥ {{ formatMoney(visibleBudgetSummary.overallRemaining) }}
           </div>
           <p class="num-caption">
-            总预算 ¥ {{ formatMoney(visibleBudgetSummary.overallBudget) }}
-            · 已支付 ¥ {{ formatMoney(visibleBudgetSummary.totalPaid) }}（{{ overallPaidPercent }}%）
+            整体规划 ¥ {{ formatMoney(visibleBudgetSummary.overallBudget) }}
+            · 已花 ¥ {{ formatMoney(visibleBudgetSummary.totalPaid) }}（{{ overallPaidPercent }}%）
           </p>
         </div>
         <el-progress
@@ -30,11 +30,22 @@
           :stroke-width="12"
           :color="visibleBudgetSummary.isOverOverallBudget ? COLORS.danger : COLORS.primary"
         />
-        <div v-if="visibleBudgetSummary.isOverOverallBudget" class="over-budget">已支付超过整体预算</div>
+        <div v-if="visibleBudgetSummary.isOverOverallBudget" class="over-budget">
+          {{ formatOverBudgetMessage(visibleBudgetSummary.totalPaid, visibleBudgetSummary.overallBudget) }}
+        </div>
       </el-card>
     </section>
 
-    <section class="mine-section">
+    <button
+      type="button"
+      class="detail-expand-btn"
+      :class="{ 'detail-expand-btn--expanded': detailExpanded }"
+      @click="toggleDetailSection"
+    >
+      {{ detailExpanded ? '收起预算明细 ↑' : '查看预算明细与云端共享 →' }}
+    </button>
+
+    <section v-show="detailExpanded" class="mine-section">
       <div class="section-header">
         <h3 class="section-title">预算明细</h3>
         <el-button type="primary" round @click="openDialog()">新增预算</el-button>
@@ -43,33 +54,33 @@
       <el-card class="card-block detail-summary-card" shadow="never">
         <div class="detail-summary-grid">
           <div>
-            <div class="card-label">明细总预算</div>
+            <div class="card-label">各项规划合计</div>
             <div class="num-secondary">¥ {{ formatMoney(visibleBudgetSummary.totalBudget) }}</div>
           </div>
           <div>
-            <div class="card-label">实际费用</div>
+            <div class="card-label">已经花出去</div>
             <div class="num-secondary">¥ {{ formatMoney(visibleBudgetSummary.totalActual) }}</div>
           </div>
           <div>
-            <div class="card-label">预算差额</div>
+            <div class="card-label">还能花多少</div>
             <div class="num-secondary" :class="varianceClass(visibleBudgetSummary.variance)">
-              {{ formatVariance(visibleBudgetSummary.variance) }}
+              {{ formatBudgetBalance(visibleBudgetSummary.variance) }}
             </div>
-            <div class="card-sub">{{ varianceHint(visibleBudgetSummary.variance) }}</div>
+            <div class="card-sub">{{ budgetBalanceHint(visibleBudgetSummary.variance) }}</div>
           </div>
           <div>
-            <div class="card-label">明细已支付</div>
+            <div class="card-label">已经付出去</div>
             <div class="num-secondary">¥ {{ formatMoney(visibleBudgetSummary.totalPaid) }}</div>
           </div>
         </div>
         <div v-if="visibleBudgetSummary.isOverBudget && !visibleBudgetSummary.isOverOverallBudget" class="over-budget">
-          已支付超过明细总预算
+          明细项已超支，比规划多花了 ¥ {{ formatMoney(visibleBudgetSummary.totalPaid - visibleBudgetSummary.totalBudget) }}
         </div>
       </el-card>
 
       <el-card v-if="visibleBudgets.length" class="card-block chart-card" shadow="never">
-        <div class="chart-title">分类支出占比</div>
-        <p class="chart-desc">按已支付 / 实际费用统计</p>
+        <div class="chart-title">各类花了多少</div>
+        <p class="chart-desc">按已经付出去统计</p>
         <BudgetPieChart :segments="categoryChartData" />
       </el-card>
 
@@ -88,7 +99,7 @@
                 <div class="category-head-main">
                   <span class="category-title">{{ group.category }}</span>
                   <span class="category-meta">
-                    {{ group.count }} 项 · 预算 ¥ {{ formatMoney(group.budgetTotal) }} · 已支付 ¥ {{ formatMoney(group.paidTotal) }}
+                    {{ group.count }} 项 · 规划 ¥ {{ formatMoney(group.budgetTotal) }} · 已花 ¥ {{ formatMoney(group.paidTotal) }}
                   </span>
                 </div>
               </div>
@@ -105,7 +116,7 @@
                     <div class="nested-collapse-title">
                       <span class="nested-collapse-name">{{ sub.processName }}</span>
                       <span class="nested-collapse-meta">
-                        {{ sub.items.length }} 项 · 预算 ¥ {{ formatMoney(sub.budgetTotal) }} · 已支付 ¥ {{ formatMoney(sub.paidTotal) }}
+                        {{ sub.items.length }} 项 · 规划 ¥ {{ formatMoney(sub.budgetTotal) }} · 已花 ¥ {{ formatMoney(sub.paidTotal) }}
                       </span>
                     </div>
                   </template>
@@ -129,17 +140,17 @@
                     </div>
                     <div class="budget-compare">
                       <div class="compare-item">
-                        <span class="compare-label">预算</span>
+                        <span class="compare-label">规划</span>
                         <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
                       </div>
                       <div class="compare-item">
-                        <span class="compare-label">已支付</span>
+                        <span class="compare-label">已花</span>
                         <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).paid) }}</span>
                       </div>
                       <div class="compare-item">
-                        <span class="compare-label">差额</span>
+                        <span class="compare-label">还能花</span>
                         <span class="compare-value" :class="varianceClass(getItemVariance(item).variance)">
-                          {{ formatVariance(getItemVariance(item).variance) }}
+                          {{ formatBudgetBalance(getItemVariance(item).variance) }}
                         </span>
                       </div>
                     </div>
@@ -153,15 +164,15 @@
                         <span class="detail-value">{{ item.quantity }}</span>
                       </div>
                       <div class="detail-row">
-                        <span class="detail-label">预算金额</span>
+                        <span class="detail-label">规划金额</span>
                         <span class="detail-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
                       </div>
                       <div class="detail-row">
-                        <span class="detail-label">实际费用</span>
+                        <span class="detail-label">实际花了多少</span>
                         <span class="detail-value">¥ {{ formatMoney(item.actualAmount) }}</span>
                       </div>
                       <div class="detail-row">
-                        <span class="detail-label">已支付</span>
+                        <span class="detail-label">已付出去</span>
                         <span class="detail-value">¥ {{ formatMoney(item.paidAmount) }}</span>
                       </div>
                     </div>
@@ -185,7 +196,7 @@
                       </el-tag>
                     </div>
                     <span class="nested-collapse-meta">
-                      预算 ¥ {{ formatMoney(getItemVariance(item).budget) }} · 已支付 ¥ {{ formatMoney(getItemVariance(item).paid) }}
+                      规划 ¥ {{ formatMoney(getItemVariance(item).budget) }} · 已花 ¥ {{ formatMoney(getItemVariance(item).paid) }}
                     </span>
                   </div>
                 </template>
@@ -202,17 +213,17 @@
                   </div>
                   <div class="budget-compare">
                     <div class="compare-item">
-                      <span class="compare-label">预算</span>
+                      <span class="compare-label">规划</span>
                       <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
                     </div>
                     <div class="compare-item">
-                      <span class="compare-label">已支付</span>
+                      <span class="compare-label">已花</span>
                       <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).paid) }}</span>
                     </div>
                     <div class="compare-item">
-                      <span class="compare-label">差额</span>
+                      <span class="compare-label">还能花</span>
                       <span class="compare-value" :class="varianceClass(getItemVariance(item).variance)">
-                        {{ formatVariance(getItemVariance(item).variance) }}
+                        {{ formatBudgetBalance(getItemVariance(item).variance) }}
                       </span>
                     </div>
                   </div>
@@ -226,15 +237,15 @@
                       <span class="detail-value">{{ item.quantity }}</span>
                     </div>
                     <div class="detail-row">
-                      <span class="detail-label">预算金额</span>
+                      <span class="detail-label">规划金额</span>
                       <span class="detail-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
                     </div>
                     <div class="detail-row">
-                      <span class="detail-label">实际费用</span>
+                      <span class="detail-label">实际花了多少</span>
                       <span class="detail-value">¥ {{ formatMoney(item.actualAmount) }}</span>
                     </div>
                     <div class="detail-row">
-                      <span class="detail-label">已支付</span>
+                      <span class="detail-label">已付出去</span>
                       <span class="detail-value">¥ {{ formatMoney(item.paidAmount) }}</span>
                     </div>
                   </div>
@@ -247,9 +258,18 @@
 
     </section>
 
-    <section class="mine-section">
-      <CloudSyncSection />
+    <section v-show="detailExpanded" class="mine-section">
+      <CloudSyncSection :default-expanded="expandSyncOnOpen" />
     </section>
+
+    <button
+      v-if="detailExpanded"
+      type="button"
+      class="detail-expand-btn detail-expand-btn--bottom"
+      @click="closeDetailSection"
+    >
+      收起预算明细 ↑
+    </button>
 
     <el-dialog
       v-model="dialogVisible"
@@ -289,7 +309,7 @@
             placeholder="填写备注或注意事项"
           />
         </el-form-item>
-        <el-form-item label="预算单价" required>
+        <el-form-item label="规划单价" required>
           <el-input-number
             v-model="form.unitPrice"
             :min="0"
@@ -309,10 +329,10 @@
             :disabled="form.procurementLinked"
           />
         </el-form-item>
-        <el-form-item label="预算金额">
+        <el-form-item label="规划金额">
           <span class="readonly-value">¥ {{ formatMoney(calcBudgetItemTotal(form.unitPrice, form.quantity)) }}</span>
         </el-form-item>
-        <el-form-item label="实际费用">
+        <el-form-item label="实际花了多少">
           <el-input-number
             v-if="!form.procurementLinked"
             v-model="form.actualAmount"
@@ -321,9 +341,9 @@
             controls-position="right"
             style="width: 100%"
           />
-          <span v-else class="readonly-value">¥ {{ formatMoney(form.actualAmount) }}（来自{{ form.procurementPage }}采购成本）</span>
+          <span v-else class="readonly-value">¥ {{ formatMoney(form.actualAmount) }}（来自{{ form.procurementPage }}采购）</span>
         </el-form-item>
-        <el-form-item label="已支付">
+        <el-form-item label="已付出去">
           <el-input-number
             v-model="form.paidAmount"
             :min="0"
@@ -342,7 +362,8 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch, nextTick } from 'vue'
+import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   BUDGET_CATEGORIES,
@@ -361,7 +382,7 @@ import {
   calcBudgetItemPlanningAmount,
   isBudgetItemVisible,
 } from '../utils/calc'
-import { formatMoney, formatVariance } from '../utils/format'
+import { formatMoney, formatBudgetBalance, budgetBalanceHint, formatOverBudgetMessage } from '../utils/format'
 import { getProcurementBudgetSource, getProcurementSyncLabel } from '../utils/materialBudgetSync'
 import { useAppStore } from '../composables/useAppStore'
 import ImportantMattersSection from '../components/ImportantMattersSection.vue'
@@ -384,6 +405,11 @@ const CATEGORY_COLORS = {
 }
 
 const { state, pendingTodoCount, overallBudget, addBudget, updateBudget, deleteBudget } = useAppStore()
+
+const route = useRoute()
+const detailExpanded = ref(false)
+const expandSyncOnOpen = ref(false)
+const categoriesInitialized = ref(false)
 
 const visibleBudgets = computed(() => state.budgets.filter(isBudgetItemVisible))
 
@@ -429,22 +455,67 @@ const budgetDetailGroups = computed(() =>
 const dialogVisible = ref(false)
 const editingId = ref('')
 const skipCategorySideEffect = ref(false)
-const expandedCategories = ref([...BUDGET_CATEGORIES])
+const expandedCategories = ref([])
 const expandedLaborPanels = ref([...PROCESS_NAMES, '未指定工序'])
 const expandedBudgetItems = ref([])
+
+watch(
+  budgetDetailGroups,
+  (groups) => {
+    if (categoriesInitialized.value) return
+    if (!groups.length) return
+    categoriesInitialized.value = true
+    expandedCategories.value = groups
+      .filter((group) => group.paidTotal > group.budgetTotal)
+      .map((group) => group.category)
+  },
+  { immediate: true }
+)
+
+onMounted(() => {
+  if (route.query.expand === 'detail' || route.query.expand === 'sync' || route.query.focus === 'overall') {
+    detailExpanded.value = true
+    expandSyncOnOpen.value = route.query.expand === 'sync'
+  }
+  nextTick(() => {
+    if (route.query.focus === 'overall') {
+      document.querySelector('.overall-budget-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    }
+  })
+})
+
+function openDetailSection() {
+  detailExpanded.value = true
+  nextTick(() => {
+    document.querySelector('.detail-summary-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+function closeDetailSection() {
+  detailExpanded.value = false
+  expandSyncOnOpen.value = false
+  nextTick(() => {
+    document.querySelector('.overall-budget-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+function toggleDetailSection() {
+  if (detailExpanded.value) {
+    closeDetailSection()
+  } else {
+    openDetailSection()
+  }
+}
 
 watch(
   visibleBudgets,
   (items) => {
     const ids = items.filter((item) => item.category !== LABOR_BUDGET_CATEGORY).map((item) => item.id)
-    const next = expandedBudgetItems.value.filter((id) => ids.includes(id))
-    ids.forEach((id) => {
-      if (!next.includes(id)) next.push(id)
-    })
-    expandedBudgetItems.value = next
+    expandedBudgetItems.value = expandedBudgetItems.value.filter((id) => ids.includes(id))
   },
   { immediate: true }
 )
+
 const form = reactive({
   category: '',
   processName: '',
@@ -518,13 +589,6 @@ function varianceClass(val) {
   if (num < 0) return 'danger'
   if (num > 0) return 'success'
   return ''
-}
-
-function varianceHint(val) {
-  const num = Number(val || 0)
-  if (num > 0) return '预算未支完'
-  if (num < 0) return '已支付超明细预算'
-  return '已按预算支完'
 }
 
 function overallRemainingClass(val) {
@@ -664,6 +728,27 @@ function remove(id) {
 }
 .mine-section {
   margin-bottom: 20px;
+}
+.detail-expand-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: 20px;
+  padding: 12px;
+  border: 1px dashed rgba(184, 115, 74, 0.35);
+  border-radius: 10px;
+  background: #faf6f2;
+  color: var(--reno-primary);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.detail-expand-btn--expanded {
+  background: #fff;
+  border-style: solid;
+  border-color: rgba(184, 115, 74, 0.25);
+}
+.detail-expand-btn--bottom {
+  margin-top: 4px;
 }
 .mine-section:last-child {
   margin-bottom: 0;

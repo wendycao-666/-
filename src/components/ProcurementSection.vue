@@ -29,19 +29,26 @@
         <p class="note-text">{{ item.note }}</p>
       </div>
 
+      <div v-if="budgetCategory" class="category-budget-bar">
+        预算 · {{ budgetCategory }} · 已花 ¥ {{ formatMoney(categoryUsage.paidTotal) }}
+        <template v-if="categoryUsage.budgetTotal > 0">
+          / ¥ {{ formatMoney(categoryUsage.budgetTotal) }}
+        </template>
+      </div>
+
       <div class="budget-compare">
         <div class="compare-item">
-          <span class="compare-label">预算</span>
+          <span class="compare-label">规划</span>
           <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
         </div>
         <div class="compare-item">
-          <span class="compare-label">已支付</span>
+          <span class="compare-label">已花</span>
           <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).paid) }}</span>
         </div>
         <div class="compare-item">
-          <span class="compare-label">差额</span>
+          <span class="compare-label">还能花</span>
           <span class="compare-value" :class="varianceClass(getItemVariance(item).variance)">
-            {{ formatVariance(getItemVariance(item).variance) }}
+            {{ formatBudgetBalance(getItemVariance(item).variance) }}
           </span>
         </div>
       </div>
@@ -76,7 +83,7 @@
             @change="emitSave(item)"
           />
         </el-form-item>
-        <el-form-item label="预算单价">
+        <el-form-item label="规划单价">
           <el-input-number
             v-model="item.unitPrice"
             :min="0"
@@ -96,10 +103,10 @@
             @change="emitSave(item)"
           />
         </el-form-item>
-        <el-form-item label="预算金额">
+        <el-form-item label="规划金额">
           <span class="readonly-value">¥ {{ formatMoney(calcBudgetItemTotal(item.unitPrice, item.quantity)) }}</span>
         </el-form-item>
-        <el-form-item label="实际费用">
+        <el-form-item label="实际花了多少">
           <el-input-number
             v-model="item.cost"
             :min="0"
@@ -109,7 +116,7 @@
             @change="emitSave(item)"
           />
         </el-form-item>
-        <el-form-item label="已支付">
+        <el-form-item label="已付出去">
           <el-input-number
             v-model="item.paidAmount"
             :min="0"
@@ -133,11 +140,14 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { PURCHASE_STATUS, WARNING_STATUS } from '../constants'
 import { calcBudgetItemTotal, calcBudgetItemVariance } from '../utils/calc'
-import { formatMoney, formatVariance } from '../utils/format'
+import { getCategoryBudgetUsage } from '../utils/budgetCategory'
+import { formatMoney, formatBudgetBalance } from '../utils/format'
+import { useAppStore } from '../composables/useAppStore'
 
-defineProps({
+const props = defineProps({
   items: {
     type: Array,
     required: true,
@@ -146,17 +156,29 @@ defineProps({
     type: String,
     required: true,
   },
+  budgetCategory: {
+    type: String,
+    default: '',
+  },
   highlightId: {
     type: String,
     default: '',
   },
   syncTip: {
     type: String,
-    default: '填写实际费用后同步至预算页',
+    default: '填写实际花了多少后，会同步到预算页',
   },
 })
 
 const emit = defineEmits(['save'])
+
+const { state } = useAppStore()
+
+const categoryUsage = computed(() =>
+  props.budgetCategory
+    ? getCategoryBudgetUsage(state.budgets, props.budgetCategory)
+    : { budgetTotal: 0, paidTotal: 0, remaining: 0 }
+)
 
 function emitSave(item) {
   emit('save', item)
@@ -225,6 +247,16 @@ function warningTagType(status) {
   background: #fdf6ec;
   border-left: 3px solid #E6A23C;
   border-radius: 0 6px 6px 0;
+}
+.category-budget-bar {
+  margin-bottom: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--reno-primary);
+  background: rgba(184, 115, 74, 0.08);
+  border: 1px solid rgba(184, 115, 74, 0.15);
 }
 .note-label {
   display: block;

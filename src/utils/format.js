@@ -38,3 +38,25 @@ export function formatVariance(val) {
   const prefix = num > 0 ? '+' : '-'
   return `${prefix}¥ ${formatMoney(Math.abs(num))}`
 }
+
+/** 业主视角：规划金额 vs 已付后的结余表述 */
+export function formatBudgetBalance(val) {
+  const num = Number(val || 0)
+  if (num > 0) return `还能花 ¥ ${formatMoney(num)}`
+  if (num < 0) return `已超 ¥ ${formatMoney(Math.abs(num))}`
+  return '刚好花完'
+}
+
+export function budgetBalanceHint(val) {
+  const num = Number(val || 0)
+  if (num > 0) return '在规划范围内'
+  if (num < 0) return '建议核对这类支出'
+  return '与规划一致'
+}
+
+export function formatOverBudgetMessage(paid, budget, categoryName = '') {
+  const over = Number(paid || 0) - Number(budget || 0)
+  if (over <= 0) return ''
+  const prefix = categoryName ? `${categoryName}已超支，` : '比规划多花了 '
+  return `${prefix}¥ ${formatMoney(over)}`
+}

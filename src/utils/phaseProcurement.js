@@ -139,6 +139,18 @@ export function countPhasePendingItems(groups) {
   return groups.reduce((sum, group) => sum + group.items.length, 0)
 }
 
+export function countPendingItemsForProcess(state, processName) {
+  if (!processName) return 0
+  const byProcess = collectProcurementEntriesByProcess(state)
+  return (byProcess[processName] || []).filter(({ item }) => isPendingProcurement(item)).length
+}
+
+export function listPendingEntriesForProcess(state, processName) {
+  if (!processName) return []
+  const byProcess = collectProcurementEntriesByProcess(state)
+  return sortPhaseItems(byProcess[processName] || []).filter(({ item }) => isPendingProcurement(item))
+}
+
 export function warningTagType(status) {
   if (status === WARNING_STATUS.OVERDUE) return 'danger'
   if (status === WARNING_STATUS.EXPIRING) return 'warning'

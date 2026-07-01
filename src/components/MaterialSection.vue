@@ -1,5 +1,11 @@
 <template>
   <div class="material-section">
+    <div v-if="visibleMaterials.length" class="category-budget-bar">
+      预算 · 主材 · 已花 ¥ {{ formatMoney(categoryUsage.paidTotal) }}
+      <template v-if="categoryUsage.budgetTotal > 0">
+        / ¥ {{ formatMoney(categoryUsage.budgetTotal) }}
+      </template>
+    </div>
     <el-card
       v-for="item in visibleMaterials"
       :key="item.id"
@@ -25,17 +31,17 @@
 
       <div class="budget-compare">
         <div class="compare-item">
-          <span class="compare-label">预算</span>
+          <span class="compare-label">规划</span>
           <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).budget) }}</span>
         </div>
         <div class="compare-item">
-          <span class="compare-label">已支付</span>
+          <span class="compare-label">已花</span>
           <span class="compare-value">¥ {{ formatMoney(getItemVariance(item).paid) }}</span>
         </div>
         <div class="compare-item">
-          <span class="compare-label">差额</span>
+          <span class="compare-label">还能花</span>
           <span class="compare-value" :class="varianceClass(getItemVariance(item).variance)">
-            {{ formatVariance(getItemVariance(item).variance) }}
+            {{ formatBudgetBalance(getItemVariance(item).variance) }}
           </span>
         </div>
       </div>
@@ -70,7 +76,7 @@
             @change="saveMaterial(item)"
           />
         </el-form-item>
-        <el-form-item label="预算单价">
+        <el-form-item label="规划单价">
           <el-input-number
             v-model="item.unitPrice"
             :min="0"
@@ -90,10 +96,10 @@
             @change="saveMaterial(item)"
           />
         </el-form-item>
-        <el-form-item label="预算金额">
+        <el-form-item label="规划金额">
           <span class="readonly-value">¥ {{ formatMoney(calcBudgetItemTotal(item.unitPrice, item.quantity)) }}</span>
         </el-form-item>
-        <el-form-item label="实际费用">
+        <el-form-item label="实际花了多少">
           <el-input-number
             v-model="item.cost"
             :min="0"
@@ -103,7 +109,7 @@
             @change="saveMaterial(item)"
           />
         </el-form-item>
-        <el-form-item label="已支付">
+        <el-form-item label="已付出去">
           <el-input-number
             v-model="item.paidAmount"
             :min="0"
@@ -121,7 +127,7 @@
           </el-select>
         </el-form-item>
       </el-form>
-      <p class="field-tip">填写实际费用后同步至「预算 · 主材」</p>
+      <p class="field-tip">填写实际花了多少后，会同步到「预算 · 主材」</p>
     </el-card>
   </div>
 </template>
@@ -130,7 +136,8 @@
 import { computed } from 'vue'
 import { PURCHASE_STATUS, WARNING_STATUS } from '../constants'
 import { calcBudgetItemTotal, calcBudgetItemVariance } from '../utils/calc'
-import { formatMoney, formatVariance } from '../utils/format'
+import { getCategoryBudgetUsage } from '../utils/budgetCategory'
+import { formatMoney, formatBudgetBalance } from '../utils/format'
 import { useAppStore } from '../composables/useAppStore'
 
 const props = defineProps({
@@ -152,6 +159,8 @@ const visibleMaterials = computed(() => {
     .map((name) => state.materials.find((item) => item.name === name))
     .filter(Boolean)
 })
+
+const categoryUsage = computed(() => getCategoryBudgetUsage(state.budgets, '主材'))
 
 function varianceClass(val) {
   const num = Number(val || 0)
@@ -190,6 +199,19 @@ function saveMaterial(item) {
 </script>
 
 <style scoped>
+.material-section {
+  width: 100%;
+}
+.category-budget-bar {
+  margin-bottom: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--reno-primary);
+  background: rgba(184, 115, 74, 0.08);
+  border: 1px solid rgba(184, 115, 74, 0.15);
+}
 .material-card {
   margin-bottom: 12px;
   scroll-margin-top: 120px;

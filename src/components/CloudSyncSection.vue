@@ -45,16 +45,30 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { ArrowRight } from '@element-plus/icons-vue'
 import { useAppStore } from '../composables/useAppStore'
 import { parseProjectIdFromInput } from '../utils/projectSync'
 
+const props = defineProps({
+  defaultExpanded: {
+    type: Boolean,
+    default: false,
+  },
+})
+
 const { syncMeta, shareLink, createCloudProject, openCloudProject } = useAppStore()
 
-const expanded = ref(false)
+const expanded = ref(props.defaultExpanded)
 const openLinkInput = ref('')
+
+watch(
+  () => props.defaultExpanded,
+  (value) => {
+    if (value) expanded.value = true
+  }
+)
 
 function showCloudSetupGuide() {
   ElMessageBox.alert(

@@ -44,8 +44,18 @@
             </li>
           </ul>
           <div class="mobile-phase-actions">
-            <el-button type="primary" size="small" round @click.stop="openAcceptance(group.name)">验收</el-button>
-            <el-button size="small" round @click.stop="openEditById(group.id)">编辑</el-button>
+            <button
+              v-if="getPendingCount(group.name) > 0"
+              type="button"
+              class="mobile-procurement-link"
+              @click.stop="goProcurementForProcess(group.name)"
+            >
+              本阶段待采购 {{ getPendingCount(group.name) }} 项 →
+            </button>
+            <div class="mobile-phase-actions-row">
+              <el-button type="primary" size="small" round @click.stop="openAcceptance(group.name)">验收</el-button>
+              <el-button size="small" round @click.stop="openEditById(group.id)">编辑</el-button>
+            </div>
           </div>
         </button>
       </div>
@@ -172,6 +182,14 @@
       </div>
       <p v-if="process.note" class="process-note">备注：{{ process.note }}</p>
       <div class="process-actions">
+        <el-button
+          v-if="getPendingCount(process.name) > 0"
+          link
+          type="primary"
+          @click="goProcurementForProcess(process.name)"
+        >
+          本阶段待采购 {{ getPendingCount(process.name) }} 项 →
+        </el-button>
         <el-button type="primary" size="small" round @click="openAcceptance(process.name)">验收</el-button>
         <el-button size="small" round @click="openEdit(process)">编辑</el-button>
       </div>
@@ -221,11 +239,12 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowRight } from '@element-plus/icons-vue'
-import { ACCEPTANCE_STATUS, PROCESS_SUBTASKS, PROCESS_GANTT_COLORS, COLORS } from '../constants'
+import { ACCEPTANCE_STATUS, PROCESS_SUBTASKS, PROCESS_GANTT_COLORS, COLORS, ROUTES } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
 import { buildSubtaskSchedule } from '../utils/workday'
 import { calcConstructionDays } from '../utils/calc'
 import { todayStr } from '../utils/date'
+import { countPendingItemsForProcess } from '../utils/phaseProcurement'
 import AcceptanceSection from '../components/AcceptanceSection.vue'
 import AcceptanceFormDialog from '../components/AcceptanceFormDialog.vue'
 
@@ -483,6 +502,17 @@ function openEditById(id) {
   if (process) openEdit(process)
 }
 
+function getPendingCount(processName) {
+  return countPendingItemsForProcess(state, processName)
+}
+
+function goProcurementForProcess(processName) {
+  router.push({
+    path: ROUTES.PROCUREMENT,
+    query: { process: processName },
+  })
+}
+
 function submitEdit() {
   if (!form.startDate || !form.endDate) {
     ElMessage.warning('请完善必填信息')
@@ -630,10 +660,29 @@ function submitEdit() {
 
 .mobile-phase-actions {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-top: 10px;
   padding-top: 10px;
   border-top: 1px dashed var(--reno-border-light);
+}
+
+.mobile-procurement-link {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid rgba(184, 115, 74, 0.25);
+  border-radius: 8px;
+  background: rgba(184, 115, 74, 0.08);
+  color: var(--reno-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mobile-phase-actions-row {
+  display: flex;
+  gap: 8px;
 }
 
 .mobile-phase-actions .el-button {

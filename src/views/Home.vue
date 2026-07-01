@@ -3,12 +3,46 @@
     <header class="home-header">
       <div class="home-header-main">
         <h1 class="home-title">{{ state.house.address || '装修项目' }}</h1>
-        <p class="home-subtitle">
-          {{ houseMeta }}
-        </p>
+        <p class="home-subtitle">{{ houseMeta }}</p>
       </div>
-      <el-button type="primary" link @click="openHouseDialog">编辑</el-button>
+      <div class="home-header-actions">
+        <CloudSyncBadge @open="cloudDialogVisible = true" />
+        <el-button type="primary" link @click="openHouseDialog">编辑</el-button>
+      </div>
     </header>
+
+    <button type="button" class="home-decision-strip" @click="router.push(ROUTES.PROCESS)">
+      <span class="decision-item">
+        <span class="decision-label">当前工序</span>
+        <span class="decision-value">{{ currentProgress.processName }}</span>
+      </span>
+      <span class="decision-divider" aria-hidden="true" />
+      <span class="decision-item">
+        <span class="decision-label">待采购</span>
+        <span class="decision-value" :class="{ 'decision-value--alert': phasePendingCount > 0 }">
+          {{ phasePendingCount }} 项
+        </span>
+      </span>
+      <span class="decision-divider" aria-hidden="true" />
+      <span class="decision-item">
+        <span class="decision-label">还能花多少</span>
+        <span
+          class="decision-value"
+          :class="budgetSummary.overallRemaining < 0 ? 'decision-value--danger' : 'decision-value--primary'"
+        >
+          ¥ {{ formatMoney(budgetSummary.overallRemaining) }}
+        </span>
+      </span>
+    </button>
+
+    <button
+      v-if="showCloudPrompt"
+      type="button"
+      class="home-cloud-prompt"
+      @click="cloudDialogVisible = true"
+    >
+      创建分享链接，与家人同步查看 →
+    </button>
 
     <section class="home-hero">
       <PhaseProcurementPanel @select="onPhaseItemSelect" />
@@ -42,9 +76,9 @@
 
     <el-card class="card-block budget-hero" shadow="never" @click="router.push(ROUTES.BUDGET)">
       <div class="budget-hero-head">
-        <span class="card-label">剩余预算</span>
+        <span class="card-label">还能花多少</span>
         <span class="budget-hero-meta">
-          总预算 ¥ {{ formatMoney(budgetSummary.overallBudget) }}
+          整体规划 ¥ {{ formatMoney(budgetSummary.overallBudget) }}
         </span>
       </div>
       <div
@@ -62,9 +96,11 @@
         :color="budgetProgressColor"
       />
       <p class="budget-hero-foot">
-        已支付 ¥ {{ formatMoney(budgetSummary.totalPaid) }} · 占整体 {{ overallPaidPercent }}%
+        已花 ¥ {{ formatMoney(budgetSummary.totalPaid) }} · 占整体 {{ overallPaidPercent }}%
       </p>
-      <div v-if="budgetSummary.isOverOverallBudget" class="over-budget">已支付超过整体预算</div>
+      <div v-if="budgetSummary.isOverOverallBudget" class="over-budget">
+        {{ formatOverBudgetMessage(budgetSummary.totalPaid, budgetSummary.overallBudget) }}
+      </div>
     </el-card>
 
     <el-card
@@ -84,28 +120,8 @@
       <el-collapse-item name="more">
         <template #title>
           <span class="home-more-title">更多概况</span>
-          <span class="home-more-hint">{{ moreSummary }}</span>
+          <span class="home-more-hint">验收 {{ progress.doneCount }}/{{ progress.totalCount }} · 进度 {{ progress.percent }}%</span>
         </template>
-
-        <el-card
-          class="card-block more-progress-card"
-          shadow="never"
-          @click="router.push(ROUTES.PROCESS)"
-        >
-          <div class="current-progress-head">
-            <span class="card-label">当前进度</span>
-            <el-tag :type="currentProgress.tagType" size="small">{{ currentProgress.phaseLabel }}</el-tag>
-          </div>
-          <div class="current-process-name">{{ currentProgress.processName }}</div>
-          <p v-if="currentProgress.dateRange" class="current-process-meta">
-            {{ currentProgress.dateRange }} · {{ currentProgress.days }} 天
-          </p>
-          <el-progress :percentage="progress.percent" :stroke-width="8" />
-          <p class="current-progress-foot">
-            整体验收 {{ progress.doneCount }} / {{ progress.totalCount }} 道工序 · {{ progress.percent }}%
-          </p>
-          <p v-if="currentProgress.hint" class="current-progress-hint">{{ currentProgress.hint }}</p>
-        </el-card>
 
         <div class="more-stats">
           <button type="button" class="more-stat-chip" @click="router.push(ROUTES.PROCUREMENT)">
@@ -125,6 +141,10 @@
         </div>
       </el-collapse-item>
     </el-collapse>
+
+    <el-dialog v-model="cloudDialogVisible" title="云端共享" width="90%" style="max-width: 480px">
+      <CloudSyncSection default-expanded />
+    </el-dialog>
 
     <el-dialog v-model="houseDialogVisible" title="编辑项目信息" width="90%" style="max-width: 420px">
       <el-form label-width="96px">
@@ -157,12 +177,14 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
 import { ROUTES, OVERALL_BUDGET, COLORS, WARNING_STATUS } from '../constants'
-import { formatMoney } from '../utils/format'
+import { formatMoney, formatOverBudgetMessage } from '../utils/format'
 import { useAppStore } from '../composables/useAppStore'
 import { getCurrentProcessInfo } from '../utils/calc'
 import { buildPhaseProcurementGroups, countPhasePendingItems } from '../utils/phaseProcurement'
 import { warningFilterToQuery } from '../utils/procurementWarning'
 import PhaseProcurementPanel from '../components/PhaseProcurementPanel.vue'
+import CloudSyncBadge from '../components/CloudSyncBadge.vue'
+import CloudSyncSection from '../components/CloudSyncSection.vue'
 
 const router = useRouter()
 const {
@@ -172,11 +194,13 @@ const {
   procurementWarningStats,
   pendingTodoCount,
   overallBudget,
+  syncMeta,
   refreshWarningsIfNeeded,
   updateHouse,
 } = useAppStore()
 
 const houseDialogVisible = ref(false)
+const cloudDialogVisible = ref(false)
 const houseForm = reactive({ area: '', address: '', overallBudget: OVERALL_BUDGET })
 const moreExpanded = ref([])
 
@@ -202,9 +226,7 @@ const houseMeta = computed(() => {
   return parts.join(' · ')
 })
 
-const moreSummary = computed(() => {
-  return `${currentProgress.value.processName} · ${progress.value.percent}%`
-})
+const showCloudPrompt = computed(() => syncMeta.cloudReady && !syncMeta.projectId)
 
 onMounted(() => {
   refreshWarningsIfNeeded()
@@ -268,6 +290,87 @@ function goProcurementWarning(status) {
   margin: 0;
   font-size: 13px;
   color: var(--reno-text-muted);
+}
+
+.home-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.home-decision-strip {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  margin-bottom: 12px;
+  padding: 12px;
+  border: 1px solid var(--reno-border-light);
+  border-radius: 12px;
+  background: var(--reno-surface);
+  cursor: pointer;
+  text-align: left;
+  transition: box-shadow 0.2s;
+}
+
+.home-decision-strip:hover {
+  box-shadow: var(--reno-shadow);
+}
+
+.decision-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.decision-label {
+  font-size: 11px;
+  color: var(--reno-text-muted);
+}
+
+.decision-value {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--reno-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.decision-value--primary {
+  color: var(--reno-primary);
+}
+
+.decision-value--danger {
+  color: var(--reno-danger);
+}
+
+.decision-value--alert {
+  color: var(--reno-warning);
+}
+
+.decision-divider {
+  width: 1px;
+  margin: 0 10px;
+  background: var(--reno-border-light);
+  flex-shrink: 0;
+}
+
+.home-cloud-prompt {
+  display: block;
+  width: 100%;
+  margin: -4px 0 12px;
+  padding: 10px 12px;
+  border: 1px dashed rgba(184, 115, 74, 0.35);
+  border-radius: 10px;
+  background: #faf6f2;
+  color: var(--reno-primary);
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
 }
 
 .home-hero {
@@ -435,48 +538,6 @@ function goProcurementWarning(status) {
   font-size: 12px;
   font-weight: 400;
   color: var(--reno-text-muted);
-}
-
-.more-progress-card {
-  margin-bottom: 10px;
-  cursor: pointer;
-}
-
-.current-progress-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.current-progress-head .card-label {
-  margin-bottom: 0;
-}
-
-.current-process-name {
-  font-size: 17px;
-  font-weight: 700;
-  color: var(--reno-text);
-  margin-bottom: 6px;
-}
-
-.current-process-meta {
-  margin: 0 0 10px;
-  font-size: 13px;
-  color: var(--reno-text-secondary);
-}
-
-.current-progress-foot {
-  margin: 8px 0 4px;
-  font-size: 12px;
-  color: var(--reno-text-muted);
-}
-
-.current-progress-hint {
-  margin: 0;
-  font-size: 12px;
-  color: var(--reno-warning);
-  line-height: 1.5;
 }
 
 .more-stats {
