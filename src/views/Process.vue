@@ -4,6 +4,54 @@
     <el-tabs v-model="activeTab" class="process-tabs">
       <el-tab-pane label="进度" name="schedule">
     <el-card class="card-block gantt-card" shadow="never">
+      <!-- 手机端：纵向工序时间轴 -->
+      <div class="schedule-mobile">
+        <p v-if="todayMarker.hint" class="mobile-today-hint">{{ todayMarker.hint }}</p>
+        <p v-else-if="todayMarker.visible" class="mobile-today-hint mobile-today-hint--active">
+          今天 {{ todayMarker.date }}
+        </p>
+
+        <button
+          v-for="group in ganttGroups"
+          :key="`m-${group.id}`"
+          type="button"
+          class="mobile-phase"
+          :class="{ 'is-selected': selectedItemId === group.id, 'is-done': group.acceptanceStatus === ACCEPTANCE_STATUS.DONE }"
+          @click="toggleMobilePhase(group.id)"
+        >
+          <div class="mobile-phase-head">
+            <span class="mobile-phase-name">
+              <el-icon class="mobile-phase-arrow" :class="{ expanded: expandedGroups[group.id] }">
+                <ArrowRight />
+              </el-icon>
+              {{ group.name }}
+            </span>
+            <el-tag :type="statusTagType(group.acceptanceStatus)" size="small">
+              {{ group.acceptanceStatus }}
+            </el-tag>
+          </div>
+          <p class="mobile-phase-meta">{{ group.startDate }} ~ {{ group.endDate }} · {{ group.days }} 天</p>
+          <div class="mobile-phase-track" aria-hidden="true">
+            <div
+              class="mobile-phase-bar"
+              :style="{ ...group.barStyle, background: group.barColor }"
+            />
+          </div>
+          <ul v-if="expandedGroups[group.id]" class="mobile-subtasks">
+            <li v-for="sub in group.subtasks" :key="sub.id" class="mobile-subtask">
+              <span>{{ sub.name }}</span>
+              <span class="mobile-subtask-meta">{{ sub.days }} 天</span>
+            </li>
+          </ul>
+          <div class="mobile-phase-actions">
+            <el-button type="primary" size="small" round @click.stop="openAcceptance(group.name)">验收</el-button>
+            <el-button size="small" round @click.stop="openEditById(group.id)">编辑</el-button>
+          </div>
+        </button>
+      </div>
+
+      <!-- 桌面端：甘特图 -->
+      <div class="gantt-desktop">
       <div class="gantt-scroll">
         <div class="gantt-inner">
       <div class="gantt-header">
@@ -106,6 +154,7 @@
         </div>
       </div>
         </div>
+      </div>
       </div>
     </el-card>
 
@@ -235,6 +284,11 @@ const expandedGroups = reactive(buildDefaultExpandedGroups())
 const selectedItemId = ref(findCurrentProcessId(state.processes) || state.processes[0]?.id || '')
 
 function toggleGroup(id) {
+  expandedGroups[id] = !expandedGroups[id]
+}
+
+function toggleMobilePhase(id) {
+  selectItem(id)
   expandedGroups[id] = !expandedGroups[id]
 }
 
@@ -424,6 +478,11 @@ function openEdit(process) {
   dialogVisible.value = true
 }
 
+function openEditById(id) {
+  const process = state.processes.find((item) => item.id === id)
+  if (process) openEdit(process)
+}
+
 function submitEdit() {
   if (!form.startDate || !form.endDate) {
     ElMessage.warning('请完善必填信息')
@@ -449,6 +508,138 @@ function submitEdit() {
 .gantt-card {
   margin-bottom: 12px;
 }
+
+.schedule-mobile {
+  display: none;
+}
+
+.gantt-desktop {
+  display: block;
+}
+
+.mobile-today-hint {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--reno-warning);
+  background: #faf6ee;
+  border: 1px solid rgba(201, 146, 58, 0.2);
+}
+
+.mobile-today-hint--active {
+  color: var(--reno-danger);
+  background: #faf0ee;
+  border-color: rgba(196, 86, 77, 0.2);
+}
+
+.mobile-phase {
+  display: block;
+  width: 100%;
+  margin: 0 0 10px;
+  padding: 12px;
+  border: 1px solid var(--reno-border-light);
+  border-radius: 12px;
+  background: var(--reno-surface);
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s;
+}
+
+.mobile-phase:last-child {
+  margin-bottom: 0;
+}
+
+.mobile-phase.is-selected {
+  border-color: var(--reno-primary);
+  box-shadow: 0 0 0 1px rgba(184, 115, 74, 0.25);
+}
+
+.mobile-phase-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.mobile-phase-name {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--reno-text);
+}
+
+.mobile-phase-arrow {
+  font-size: 14px;
+  color: var(--reno-text-muted);
+  transition: transform 0.2s;
+}
+
+.mobile-phase-arrow.expanded {
+  transform: rotate(90deg);
+}
+
+.mobile-phase-meta {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--reno-text-muted);
+  line-height: 1.4;
+}
+
+.mobile-phase-track {
+  position: relative;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--reno-bg-subtle);
+  overflow: hidden;
+}
+
+.mobile-phase-bar {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  min-width: 6%;
+  border-radius: 999px;
+}
+
+.mobile-subtasks {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 10px 0 0;
+  border-top: 1px dashed var(--reno-border-light);
+}
+
+.mobile-subtask {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+  color: var(--reno-text-secondary);
+}
+
+.mobile-subtask-meta {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--reno-text-muted);
+}
+
+.mobile-phase-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--reno-border-light);
+}
+
+.mobile-phase-actions .el-button {
+  flex: 1;
+}
+
 .gantt-scroll {
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
@@ -690,38 +881,21 @@ function submitEdit() {
   flex-wrap: wrap;
 }
 @media (max-width: 640px) {
+  .schedule-mobile {
+    display: block;
+  }
+
+  .gantt-desktop {
+    display: none;
+  }
+
+  .process-card {
+    display: none;
+  }
+
   .process-tabs :deep(.el-tabs__item) {
     padding: 0 14px;
     font-size: 14px;
-  }
-  .gantt-inner {
-    min-width: 520px;
-  }
-  .axis-tick-date {
-    font-size: 10px;
-  }
-  .axis-tick-name {
-    font-size: 9px;
-  }
-  .gantt-header,
-  .gantt-row {
-    grid-template-columns: 108px 1fr;
-    gap: 8px;
-  }
-  .gantt-name {
-    font-size: 12px;
-  }
-  .gantt-name-sub {
-    padding-left: 14px;
-    font-size: 11px;
-  }
-  .gantt-duration-label {
-    font-size: 11px;
-    padding: 4px 8px;
-  }
-  .gantt-today-hint {
-    margin-left: 116px;
-    font-size: 11px;
   }
   .process-head {
     flex-wrap: wrap;
