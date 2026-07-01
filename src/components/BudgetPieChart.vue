@@ -116,7 +116,7 @@ const slices = computed(() => {
   color: #303133;
 }
 .legend-value {
-  color: #409EFF;
+  color: var(--reno-primary);
   font-weight: 600;
 }
 @media (max-width: 640px) {

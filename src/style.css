@@ -1,8 +1,46 @@
 :root {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  /* 装修场景主题：暖灰底 + 陶土 accent */
+  --reno-bg: #f5f0ea;
+  --reno-bg-subtle: #ebe3d9;
+  --reno-surface: #fffcf8;
+  --reno-border: #e5dace;
+  --reno-border-light: #f0e8de;
+  --reno-text: #3d3630;
+  --reno-text-secondary: #6b635a;
+  --reno-text-muted: #9a9188;
+  --reno-primary: #b8734a;
+  --reno-primary-light: #f3e8df;
+  --reno-primary-dark: #8f5a38;
+  --reno-primary-rgb: 184, 115, 74;
+  --reno-shadow: 0 2px 12px rgba(61, 54, 48, 0.06);
+  --reno-shadow-hover: 0 6px 20px rgba(184, 115, 74, 0.14);
+  --reno-success: #5f8f65;
+  --reno-warning: #c9923a;
+  --reno-danger: #c4564d;
+
+  /* Element Plus 主题覆盖 */
+  --el-color-primary: var(--reno-primary);
+  --el-color-primary-light-3: #d4a688;
+  --el-color-primary-light-5: #e3c4af;
+  --el-color-primary-light-7: #f0ded2;
+  --el-color-primary-light-8: #f7ede6;
+  --el-color-primary-light-9: var(--reno-primary-light);
+  --el-color-primary-dark-2: var(--reno-primary-dark);
+  --el-color-success: var(--reno-success);
+  --el-color-warning: var(--reno-warning);
+  --el-color-danger: var(--reno-danger);
+  --el-border-radius-base: 10px;
+  --el-bg-color: var(--reno-surface);
+  --el-bg-color-page: var(--reno-bg);
+  --el-text-color-primary: var(--reno-text);
+  --el-text-color-regular: var(--reno-text-secondary);
+  --el-border-color-light: var(--reno-border-light);
+
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
   line-height: 1.5;
-  color: #303133;
-  background: #f5f7fa;
+  color: var(--reno-text);
+  background: var(--reno-bg);
 }
 
 * {
@@ -12,6 +50,7 @@
 body {
   margin: 0;
   min-width: 320px;
+  background: var(--reno-bg);
 }
 
 #app {
@@ -22,6 +61,7 @@ body {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  background: var(--reno-bg);
 }
 
 .app-main {
@@ -39,10 +79,15 @@ body {
 .page-title {
   margin: 0 0 16px;
   font-size: 20px;
+  color: var(--reno-text);
+  font-weight: 700;
 }
 
 .card-block {
-  border-radius: 8px !important;
+  border-radius: 12px !important;
+  border: 1px solid var(--reno-border-light) !important;
+  box-shadow: var(--reno-shadow) !important;
+  background: var(--reno-surface) !important;
 }
 
 .card-block :deep(.el-card__body) {
@@ -58,38 +103,89 @@ body {
 
 .card-label {
   font-size: 13px;
-  color: #909399;
+  color: var(--reno-text-muted);
   margin-bottom: 6px;
 }
 
 .card-value {
-  font-size: 22px;
+  font-size: 18px;
   font-weight: 600;
   margin-bottom: 8px;
+  color: var(--reno-text);
 }
 
 .card-value.primary {
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 
 .card-value.danger,
 .danger {
-  color: #F56C6C;
+  color: var(--reno-danger);
 }
 
 .card-value.warning,
 .warning {
-  color: #E6A23C;
+  color: var(--reno-warning);
 }
 
 .card-value.success,
 .success {
-  color: #67C23A;
+  color: var(--reno-success);
+}
+
+/* P1-2 数字层级 */
+.num-hero {
+  font-size: 40px;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: -0.03em;
+  color: var(--reno-text);
+}
+
+.num-hero.primary {
+  color: var(--reno-primary);
+}
+
+.num-stat {
+  font-size: 24px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.num-stat--danger {
+  font-size: 32px;
+  font-weight: 800;
+  color: var(--reno-danger);
+}
+
+.num-stat--warning {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--reno-warning);
+}
+
+.num-stat--muted {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--reno-text-muted);
+}
+
+.num-secondary {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--reno-text-secondary);
+}
+
+.num-caption {
+  margin: 0;
+  font-size: 12px;
+  color: var(--reno-text-muted);
+  line-height: 1.5;
 }
 
 .card-sub {
   font-size: 13px;
-  color: #909399;
+  color: var(--reno-text-muted);
 }
 
 .card-row {
@@ -101,13 +197,13 @@ body {
 }
 
 .risk-card {
-  border: 1px solid #F56C6C !important;
-  background: #fef0f0;
+  border: 1px solid rgba(196, 86, 77, 0.35) !important;
+  background: #faf0ee !important;
 }
 
 .over-budget {
   margin-top: 8px;
-  color: #F56C6C;
+  color: var(--reno-danger);
   font-weight: 600;
 }
 
@@ -128,17 +224,28 @@ body {
 .house-budget {
   margin: 4px 0;
   font-size: 14px;
-  color: #606266;
+  color: var(--reno-text-secondary);
 }
 
 .house-name {
   font-size: 18px;
   font-weight: 700;
-  color: #303133;
+  color: var(--reno-text);
 }
 
 .el-button {
-  border-radius: 6px;
+  border-radius: 8px;
+}
+
+.el-button--primary {
+  --el-button-bg-color: var(--reno-primary);
+  --el-button-border-color: var(--reno-primary);
+  --el-button-hover-bg-color: var(--reno-primary-dark);
+  --el-button-hover-border-color: var(--reno-primary-dark);
+}
+
+.el-progress-bar__inner {
+  background-color: var(--reno-primary) !important;
 }
 
 @media (max-width: 640px) {
@@ -162,7 +269,15 @@ body {
   }
 
   .card-value {
-    font-size: 20px;
+    font-size: 16px;
+  }
+
+  .num-hero {
+    font-size: 34px;
+  }
+
+  .num-stat--danger {
+    font-size: 28px;
   }
 
   .card-row {

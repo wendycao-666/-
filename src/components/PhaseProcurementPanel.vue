@@ -106,8 +106,8 @@ const pendingCount = computed(() => countPhasePendingItems(groups.value))
 .group-label {
   font-size: 12px;
   font-weight: 600;
-  color: #409EFF;
-  background: #ecf5ff;
+  color: var(--reno-primary);
+  background: var(--reno-primary-light);
   padding: 2px 8px;
   border-radius: 4px;
 }
@@ -141,7 +141,7 @@ const pendingCount = computed(() => countPhasePendingItems(groups.value))
   margin-bottom: 0;
 }
 .phase-item:hover {
-  border-color: #409EFF;
+  border-color: var(--reno-primary);
   background: #f5f9ff;
 }
 .item-main {

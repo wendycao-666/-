@@ -288,7 +288,7 @@ function normalizePayload(item) {
   font-size: 15px;
   font-weight: 600;
   color: #303133;
-  border-left: 3px solid #409EFF;
+  border-left: 3px solid var(--reno-primary);
   line-height: 1.4;
 }
 .procurement-tabs :deep(.el-tabs__header) {

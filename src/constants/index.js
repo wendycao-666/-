@@ -21,11 +21,11 @@ export const PROCESS_WORKDAYS = {
 }
 
 export const COLORS = {
-  primary: '#409EFF',
-  success: '#67C23A',
-  warning: '#E6A23C',
-  danger: '#F56C6C',
-  info: '#909399',
+  primary: '#B8734A',
+  success: '#5F8F65',
+  warning: '#C9923A',
+  danger: '#C4564D',
+  info: '#9A9188',
 }
 
 export const PROCESS_NAMES = [
@@ -40,13 +40,13 @@ export const PROCESS_NAMES = [
 
 /** 甘特图工序配色（一级深色、二级浅色） */
 export const PROCESS_GANTT_COLORS = {
-  拆改工程: { main: '#409EFF', light: '#79bbff' },
-  水电改造: { main: '#67C23A', light: '#95d475' },
-  泥瓦工程: { main: '#E6A23C', light: '#eebe77' },
-  木作工程: { main: '#9C27B0', light: '#CE93D8' },
-  油漆工程: { main: '#F56C6C', light: '#fab6b6' },
-  安装阶段: { main: '#00BCD4', light: '#80deea' },
-  开荒保洁: { main: '#909399', light: '#c8c9cc' },
+  拆改工程: { main: '#8B7355', light: '#C4B49A' },
+  水电改造: { main: '#5F8F65', light: '#A8C4AB' },
+  泥瓦工程: { main: '#C9923A', light: '#E5C88A' },
+  木作工程: { main: '#8F6B4A', light: '#C9A882' },
+  油漆工程: { main: '#7B8FA1', light: '#B5C0CC' },
+  安装阶段: { main: '#6B8E8E', light: '#A8C4C4' },
+  开荒保洁: { main: '#9A9188', light: '#C8C0B8' },
 }
 
 /** 工序子项（甘特图二级展示，工作日之和等于对应工序） */

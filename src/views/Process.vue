@@ -172,7 +172,7 @@ import { ref, reactive, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { ArrowRight } from '@element-plus/icons-vue'
-import { ACCEPTANCE_STATUS, PROCESS_SUBTASKS, PROCESS_GANTT_COLORS } from '../constants'
+import { ACCEPTANCE_STATUS, PROCESS_SUBTASKS, PROCESS_GANTT_COLORS, COLORS } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
 import { buildSubtaskSchedule } from '../utils/workday'
 import { calcConstructionDays } from '../utils/calc'
@@ -251,7 +251,7 @@ function buildDurationMeta(startDate, endDate) {
 }
 
 function getProcessColors(processName) {
-  return PROCESS_GANTT_COLORS[processName] || { main: '#409EFF', light: '#a0cfff' }
+  return PROCESS_GANTT_COLORS[processName] || { main: COLORS.primary, light: '#C9A882' }
 }
 
 function buildDurationLabelStyle(barStyle, colors) {
@@ -547,7 +547,7 @@ function submitEdit() {
 }
 .gantt-name-main:hover .gantt-name-text,
 .gantt-name-sub:hover .gantt-name-text {
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 .gantt-name {
   display: flex;
@@ -581,7 +581,7 @@ function submitEdit() {
   color: #909399;
 }
 .gantt-arrow:hover {
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 .gantt-arrow.expanded {
   transform: rotate(90deg);

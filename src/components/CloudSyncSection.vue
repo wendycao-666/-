@@ -155,7 +155,7 @@ async function copyShareLink() {
 
 .entry-arrow.expanded {
   transform: rotate(90deg);
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 
 .sync-card {
@@ -196,7 +196,7 @@ async function copyShareLink() {
 .sync-status {
   margin: 0;
   font-size: 12px;
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 
 .sync-error {

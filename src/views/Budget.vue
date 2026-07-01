@@ -12,29 +12,23 @@
     <section class="mine-section">
       <h3 class="section-title">整体预算</h3>
       <el-card class="card-block overall-budget-card" shadow="never">
-        <div class="overall-budget-grid">
-          <div class="overall-budget-main">
-            <div class="card-label">装修总预算</div>
-            <div class="card-value primary">¥ {{ formatMoney(visibleBudgetSummary.overallBudget) }}</div>
-            <div class="card-sub">上限 ¥ {{ formatMoney(overallBudget) }}</div>
+        <div class="budget-hero-block">
+          <div class="card-label">剩余预算</div>
+          <div
+            class="num-hero"
+            :class="overallRemainingClass(visibleBudgetSummary.overallRemaining)"
+          >
+            ¥ {{ formatMoney(visibleBudgetSummary.overallRemaining) }}
           </div>
-          <div>
-            <div class="card-label">已支付</div>
-            <div class="card-value">¥ {{ formatMoney(visibleBudgetSummary.totalPaid) }}</div>
-            <div class="card-sub">占整体 {{ overallPaidPercent }}%</div>
-          </div>
-          <div>
-            <div class="card-label">剩余预算</div>
-            <div class="card-value" :class="overallRemainingClass(visibleBudgetSummary.overallRemaining)">
-              ¥ {{ formatMoney(visibleBudgetSummary.overallRemaining) }}
-            </div>
-            <div class="card-sub">总预算 − 已支付</div>
-          </div>
+          <p class="num-caption">
+            总预算 ¥ {{ formatMoney(visibleBudgetSummary.overallBudget) }}
+            · 已支付 ¥ {{ formatMoney(visibleBudgetSummary.totalPaid) }}（{{ overallPaidPercent }}%）
+          </p>
         </div>
         <el-progress
           :percentage="overallPaidPercent"
           :stroke-width="12"
-          :color="visibleBudgetSummary.isOverOverallBudget ? '#F56C6C' : '#409EFF'"
+          :color="visibleBudgetSummary.isOverOverallBudget ? COLORS.danger : COLORS.primary"
         />
         <div v-if="visibleBudgetSummary.isOverOverallBudget" class="over-budget">已支付超过整体预算</div>
       </el-card>
@@ -50,22 +44,22 @@
         <div class="detail-summary-grid">
           <div>
             <div class="card-label">明细总预算</div>
-            <div class="card-value">¥ {{ formatMoney(visibleBudgetSummary.totalBudget) }}</div>
+            <div class="num-secondary">¥ {{ formatMoney(visibleBudgetSummary.totalBudget) }}</div>
           </div>
           <div>
             <div class="card-label">实际费用</div>
-            <div class="card-value">¥ {{ formatMoney(visibleBudgetSummary.totalActual) }}</div>
+            <div class="num-secondary">¥ {{ formatMoney(visibleBudgetSummary.totalActual) }}</div>
           </div>
           <div>
             <div class="card-label">预算差额</div>
-            <div class="card-value" :class="varianceClass(visibleBudgetSummary.variance)">
+            <div class="num-secondary" :class="varianceClass(visibleBudgetSummary.variance)">
               {{ formatVariance(visibleBudgetSummary.variance) }}
             </div>
             <div class="card-sub">{{ varianceHint(visibleBudgetSummary.variance) }}</div>
           </div>
           <div>
             <div class="card-label">明细已支付</div>
-            <div class="card-value">¥ {{ formatMoney(visibleBudgetSummary.totalPaid) }}</div>
+            <div class="num-secondary">¥ {{ formatMoney(visibleBudgetSummary.totalPaid) }}</div>
           </div>
         </div>
         <div v-if="visibleBudgetSummary.isOverBudget && !visibleBudgetSummary.isOverOverallBudget" class="over-budget">
@@ -379,7 +373,7 @@ const CATEGORY_COLORS = {
   设计: '#9254DE',
   人工: COLORS.primary,
   主材: COLORS.success,
-  基装: '#409EFF',
+  基装: COLORS.primary,
   定制: '#9C27B0',
   卫浴洁具: '#00BCD4',
   厨电: '#E6A23C',
@@ -680,14 +674,17 @@ function remove(id) {
 .overall-budget-card {
   margin-bottom: 0;
 }
-.overall-budget-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
-  margin-bottom: 16px;
+.budget-hero-block {
+  margin-bottom: 14px;
 }
-.overall-budget-main .card-value {
-  font-size: 26px;
+.budget-hero-block .num-hero.primary {
+  color: var(--reno-primary);
+}
+.budget-hero-block .num-hero.danger {
+  color: var(--reno-danger);
+}
+.budget-hero-block .num-hero.success {
+  color: var(--reno-success);
 }
 .detail-summary-card {
   margin-bottom: 12px;
@@ -800,7 +797,7 @@ function remove(id) {
   color: #67C23A;
 }
 .card-value.primary {
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 .budget-detail-list {
   margin-top: 12px;
@@ -924,7 +921,7 @@ function remove(id) {
 .budget-detail-list .budget-detail-panel {
   margin-top: 8px;
   padding: 4px 12px 8px;
-  border-left: 2px solid #ecf5ff;
+  border-left: 2px solid var(--reno-primary-light);
   margin-left: 4px;
 }
 .detail-row {
@@ -951,13 +948,9 @@ function remove(id) {
 }
 .readonly-value {
   font-weight: 600;
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 @media (max-width: 640px) {
-  .overall-budget-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
   .detail-summary-grid {
     grid-template-columns: 1fr 1fr;
     gap: 10px;

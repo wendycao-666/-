@@ -19,14 +19,14 @@
 </template>
 
 <script setup>
-import { HomeFilled, Calendar, ShoppingBag, User } from '@element-plus/icons-vue'
+import { HomeFilled, Calendar, ShoppingBag, Wallet } from '@element-plus/icons-vue'
 import { ROUTES } from './constants'
 
 const navItems = [
   { label: '首页', path: ROUTES.HOME, icon: HomeFilled },
   { label: '工序', path: ROUTES.PROCESS, icon: Calendar },
   { label: '采购', path: ROUTES.PROCUREMENT, icon: ShoppingBag },
-  { label: '我的', path: ROUTES.BUDGET, icon: User },
+  { label: '预算', path: ROUTES.BUDGET, icon: Wallet },
 ]
 </script>
 
@@ -37,8 +37,8 @@ const navItems = [
   align-items: stretch;
   gap: 4px;
   padding: 10px 16px 14px;
-  background: #fff;
-  border-bottom: 1px solid #ebeef5;
+  background: var(--reno-surface);
+  border-bottom: 1px solid var(--reno-border-light);
 }
 
 .nav-tab {
@@ -49,9 +49,9 @@ const navItems = [
   gap: 6px;
   min-width: 72px;
   padding: 8px 14px;
-  border-radius: 8px;
+  border-radius: 10px;
   font-size: 14px;
-  color: #606266;
+  color: var(--reno-text-secondary);
   text-decoration: none;
   transition: all 0.2s;
 }
@@ -67,18 +67,18 @@ const navItems = [
 }
 
 .nav-tab:hover {
-  color: #409EFF;
-  background: #ecf5ff;
+  color: var(--reno-primary);
+  background: var(--reno-primary-light);
 }
 
 .nav-tab.router-link-active {
-  color: #409EFF;
-  background: #ecf5ff;
+  color: var(--reno-primary);
+  background: var(--reno-primary-light);
   font-weight: 600;
 }
 
 .nav-tab.router-link-active .nav-icon {
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 
 @media (max-width: 640px) {
@@ -95,9 +95,9 @@ const navItems = [
     padding-left: max(2px, env(safe-area-inset-left));
     padding-right: max(2px, env(safe-area-inset-right));
     border-bottom: none;
-    border-top: 1px solid #ebeef5;
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.06);
-    background: rgba(255, 255, 255, 0.98);
+    border-top: 1px solid var(--reno-border-light);
+    box-shadow: 0 -4px 20px rgba(61, 54, 48, 0.08);
+    background: rgba(255, 252, 248, 0.96);
     backdrop-filter: blur(8px);
   }
 
@@ -114,7 +114,7 @@ const navItems = [
 
   .nav-icon {
     font-size: 22px;
-    color: #909399;
+    color: var(--reno-text-muted);
   }
 
   .nav-label {
@@ -127,12 +127,12 @@ const navItems = [
   }
 
   .nav-tab.router-link-active {
-    color: #409EFF;
+    color: var(--reno-primary);
     background: transparent;
   }
 
   .nav-tab.router-link-active .nav-icon {
-    color: #409EFF;
+    color: var(--reno-primary);
   }
 
   .nav-tab.router-link-active .nav-label {

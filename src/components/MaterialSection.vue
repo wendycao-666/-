@@ -196,7 +196,7 @@ function saveMaterial(item) {
   transition: box-shadow 0.3s;
 }
 .material-highlight {
-  box-shadow: 0 0 0 2px #409EFF;
+  box-shadow: 0 0 0 2px var(--reno-primary);
 }
 .material-head {
   display: flex;
@@ -271,7 +271,7 @@ function saveMaterial(item) {
 }
 .readonly-value {
   font-weight: 600;
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 .field-tip {
   margin: 0;

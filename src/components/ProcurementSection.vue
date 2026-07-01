@@ -192,7 +192,7 @@ function warningTagType(status) {
   transition: box-shadow 0.3s;
 }
 .procurement-highlight {
-  box-shadow: 0 0 0 2px #409EFF;
+  box-shadow: 0 0 0 2px var(--reno-primary);
 }
 .procurement-head {
   display: flex;
@@ -274,7 +274,7 @@ function warningTagType(status) {
 }
 .readonly-value {
   font-weight: 600;
-  color: #409EFF;
+  color: var(--reno-primary);
 }
 .field-tip {
   margin: 0;
