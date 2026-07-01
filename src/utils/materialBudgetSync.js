@@ -68,6 +68,10 @@ function normalizeProcurementFields(item, budget) {
   }
 }
 
+function hasProcurementPlanning(item) {
+  return Number(item.unitPrice || 0) * (Number(item.quantity || 1) || 1) > 0
+}
+
 function syncProcurementBudgets(items, budgets, config) {
   items.forEach((item) => {
     const linkedBudget = findProcurementBudget(budgets, item, config)
@@ -75,9 +79,10 @@ function syncProcurementBudgets(items, budgets, config) {
     Object.assign(item, normalized)
 
     const hasActualCost = normalized.cost > 0
+    const hasPlanning = hasProcurementPlanning(normalized)
     const budget = findProcurementBudget(budgets, item, config)
 
-    if (!hasActualCost) {
+    if (!hasActualCost && !hasPlanning) {
       if (budget) {
         const index = budgets.findIndex((entry) => entry.id === budget.id)
         if (index >= 0) budgets.splice(index, 1)
@@ -86,7 +91,7 @@ function syncProcurementBudgets(items, budgets, config) {
     }
 
     if (!budget) {
-      budgets.push({
+      const newBudget = {
         id: crypto.randomUUID(),
         ...(config.listKey
           ? { procurementKey: config.listKey, procurementId: item.id }
@@ -97,7 +102,9 @@ function syncProcurementBudgets(items, budgets, config) {
         quantity: normalized.quantity,
         actualAmount: normalized.cost,
         paidAmount: normalized.paidAmount,
-      })
+      }
+      if (item.semiPackageRef) newBudget.semiPackageRef = true
+      budgets.push(newBudget)
       return
     }
 
@@ -115,6 +122,8 @@ function syncProcurementBudgets(items, budgets, config) {
     budget.quantity = normalized.quantity
     budget.actualAmount = normalized.cost
     budget.paidAmount = normalized.paidAmount
+    if (item.semiPackageRef) budget.semiPackageRef = true
+    else delete budget.semiPackageRef
   })
 }
 
@@ -173,7 +182,7 @@ function cleanupProcurementBudgets(items, budgets, config) {
         : budget[config.idField]
     if (!linked) continue
     const item = items.find((entry) => entry.id === (config.listKey ? budget.procurementId : budget[config.idField]))
-    if (!item || Number(item.cost || 0) <= 0) {
+    if (!item || (Number(item.cost || 0) <= 0 && !hasProcurementPlanning(item))) {
       budgets.splice(index, 1)
     }
   }

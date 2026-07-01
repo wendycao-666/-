@@ -34,6 +34,62 @@
           {{ formatOverBudgetMessage(visibleBudgetSummary.totalPaid, visibleBudgetSummary.overallBudget) }}
         </div>
       </el-card>
+
+      <el-card class="card-block template-ref-card" shadow="never">
+        <div class="template-ref-head">
+          <div>
+            <div class="template-ref-title">{{ scaledSemiPackageTemplate.label }}</div>
+            <p class="template-ref-desc">{{ scaledSemiPackageTemplate.description }}</p>
+          </div>
+          <div class="template-area-input">
+            <el-input-number
+              v-model="quoteAreaSqm"
+              :min="40"
+              :max="300"
+              :step="1"
+              :precision="0"
+              controls-position="right"
+              size="small"
+              @change="onQuoteAreaChange"
+            />
+            <span class="template-area-unit">㎡</span>
+          </div>
+        </div>
+        <div class="template-ref-stats">
+          <div class="template-ref-stat">
+            <span class="template-ref-stat-label">参考规划合计</span>
+            <span class="template-ref-stat-value">¥ {{ formatMoney(templatePlanningTotal) }}</span>
+          </div>
+          <div class="template-ref-stat">
+            <span class="template-ref-stat-label">建议整体规划</span>
+            <span class="template-ref-stat-value">¥ {{ formatMoney(scaledSemiPackageTemplate.overallBudget) }}</span>
+          </div>
+        </div>
+        <div class="template-ref-actions">
+          <el-button round @click="templateDetailVisible = true">查看参考明细</el-button>
+          <el-button type="primary" round @click="handleApplyTemplate">填入参考价</el-button>
+          <el-button
+            round
+            :disabled="!hasTemplateReference"
+            @click="handleClearTemplate"
+          >
+            清除参考价
+          </el-button>
+        </div>
+        <div class="template-quote-bar">
+          <span class="template-quote-label">报价单</span>
+          <el-button round size="small" @click="handleExportQuoteTemplate">导出 Excel 模版</el-button>
+          <el-button round size="small" @click="handleExportQuoteFilled">导出当前报价</el-button>
+          <el-button round size="small" type="primary" plain @click="triggerQuoteImport">导入报价</el-button>
+          <input
+            ref="quoteFileInputRef"
+            type="file"
+            accept=".xlsx,.xls"
+            class="quote-file-input"
+            @change="handleQuoteFileChange"
+          />
+        </div>
+      </el-card>
     </section>
 
     <button
@@ -358,6 +414,37 @@
         <el-button type="primary" @click="submit">确定</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="templateDetailVisible"
+      :title="`${scaledSemiPackageTemplate.label} · ${quoteAreaSqm}㎡`"
+      width="92%"
+      class="template-detail-dialog"
+    >
+      <p class="template-dialog-desc">{{ scaledSemiPackageTemplate.description }}</p>
+      <div class="template-breakdown-list">
+        <div v-for="row in templateBreakdown" :key="row.category" class="template-breakdown-row">
+          <span>{{ row.category }}</span>
+          <span>¥ {{ formatMoney(row.amount) }}</span>
+        </div>
+        <div class="template-breakdown-row template-breakdown-total">
+          <span>参考规划合计</span>
+          <span>¥ {{ formatMoney(templatePlanningTotal) }}</span>
+        </div>
+      </div>
+      <template #footer>
+        <el-button @click="templateDetailVisible = false">关闭</el-button>
+        <el-button round size="small" @click="handleExportQuoteTemplate">导出模版</el-button>
+        <el-button round size="small" type="primary" plain @click="triggerQuoteImport">导入报价</el-button>
+        <el-button
+          :disabled="!hasTemplateReference"
+          @click="handleClearTemplateFromDialog"
+        >
+          清除参考价
+        </el-button>
+        <el-button type="primary" @click="handleApplyTemplateFromDialog">填入参考价</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -383,6 +470,19 @@ import {
   isBudgetItemVisible,
 } from '../utils/calc'
 import { formatMoney, formatBudgetBalance, budgetBalanceHint, formatOverBudgetMessage } from '../utils/format'
+import {
+  buildSemiPackageTemplateForArea,
+  resolveQuoteAreaSqm,
+  normalizeQuoteAreaSqm,
+  calcSemiPackageTemplateTotal,
+  getSemiPackageTemplateBreakdown,
+} from '../constants/semiPackageBudgetTemplate.js'
+import { hasSemiPackageReference } from '../utils/applySemiPackageTemplate.js'
+import {
+  exportSemiPackageQuoteTemplate,
+  exportSemiPackageQuoteFilled,
+  parseSemiPackageQuoteFile,
+} from '../utils/semiPackageQuoteExcel.js'
 import { getProcurementBudgetSource, getProcurementSyncLabel } from '../utils/materialBudgetSync'
 import { useAppStore } from '../composables/useAppStore'
 import ImportantMattersSection from '../components/ImportantMattersSection.vue'
@@ -404,7 +504,36 @@ const CATEGORY_COLORS = {
   杂项: COLORS.info,
 }
 
-const { state, pendingTodoCount, overallBudget, addBudget, updateBudget, deleteBudget } = useAppStore()
+const { state, pendingTodoCount, overallBudget, addBudget, updateBudget, deleteBudget, applySemiPackageBudgetTemplate, clearSemiPackageBudgetTemplate, importSemiPackageQuote, updateHouse } =
+  useAppStore()
+
+const quoteAreaSqm = ref(resolveQuoteAreaSqm(state.house.area))
+const scaledSemiPackageTemplate = computed(() => buildSemiPackageTemplateForArea(quoteAreaSqm.value))
+const templatePlanningTotal = computed(() => calcSemiPackageTemplateTotal(scaledSemiPackageTemplate.value))
+const templateBreakdown = computed(() => getSemiPackageTemplateBreakdown(scaledSemiPackageTemplate.value))
+const templateDetailVisible = ref(false)
+const quoteFileInputRef = ref(null)
+
+const hasTemplateReference = computed(() =>
+  hasSemiPackageReference(state, scaledSemiPackageTemplate.value)
+)
+
+watch(
+  () => state.house.area,
+  (area) => {
+    quoteAreaSqm.value = resolveQuoteAreaSqm(area)
+  }
+)
+
+function onQuoteAreaChange(value) {
+  const area = normalizeQuoteAreaSqm(value)
+  quoteAreaSqm.value = area
+  updateHouse({
+    area: String(area),
+    address: state.house.address,
+    overallBudget: state.house.overallBudget,
+  })
+}
 
 const route = useRoute()
 const detailExpanded = ref(false)
@@ -504,6 +633,154 @@ function toggleDetailSection() {
     closeDetailSection()
   } else {
     openDetailSection()
+  }
+}
+
+function confirmApplyTemplate() {
+  return ElMessageBox.confirm(
+    `将按 ${quoteAreaSqm.value}㎡ 估算，把空白项填入半包参考价，并将整体规划设为 ¥ ${formatMoney(scaledSemiPackageTemplate.value.overallBudget)}。已有花费记录不会被覆盖。`,
+    '填入半包参考价',
+    {
+      type: 'info',
+      confirmButtonText: '确认填入',
+      cancelButtonText: '取消',
+    }
+  )
+}
+
+async function handleApplyTemplateFromDialog() {
+  try {
+    await confirmApplyTemplate()
+  } catch {
+    return
+  }
+  runApplyTemplate()
+}
+
+function runApplyTemplate() {
+  const { filledCount } = applySemiPackageBudgetTemplate(
+    { updateOverallBudget: true },
+    scaledSemiPackageTemplate.value
+  )
+  templateDetailVisible.value = false
+  detailExpanded.value = true
+  ElMessage.success(
+    filledCount > 0
+      ? `已填入 ${filledCount} 项参考价，可在下方明细中查看和调整`
+      : '各项已有数据，未覆盖；可展开明细手动调整'
+  )
+  nextTick(() => {
+    document.querySelector('.detail-summary-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  })
+}
+
+async function handleApplyTemplate() {
+  try {
+    await confirmApplyTemplate()
+  } catch {
+    return
+  }
+  runApplyTemplate()
+}
+
+function confirmClearTemplate() {
+  return ElMessageBox.confirm(
+    '将清除由参考模版填入的规划单价，并恢复填入前的整体规划。已有花费记录不会被改动。',
+    '清除参考价',
+    {
+      type: 'warning',
+      confirmButtonText: '确认清除',
+      cancelButtonText: '取消',
+    }
+  )
+}
+
+function runClearTemplate() {
+  const { clearedCount } = clearSemiPackageBudgetTemplate(scaledSemiPackageTemplate.value)
+  templateDetailVisible.value = false
+  ElMessage.success(
+    clearedCount > 0
+      ? `已清除 ${clearedCount} 项参考价`
+      : '没有可清除的参考价（可能已有记账记录）'
+  )
+}
+
+async function handleClearTemplate() {
+  if (!hasTemplateReference.value) return
+  try {
+    await confirmClearTemplate()
+  } catch {
+    return
+  }
+  runClearTemplate()
+}
+
+async function handleClearTemplateFromDialog() {
+  if (!hasTemplateReference.value) return
+  try {
+    await confirmClearTemplate()
+  } catch {
+    return
+  }
+  runClearTemplate()
+}
+
+function handleExportQuoteTemplate() {
+  exportSemiPackageQuoteTemplate(
+    state,
+    scaledSemiPackageTemplate.value,
+    `半包预算报价模板-${quoteAreaSqm.value}㎡.xlsx`
+  )
+  ElMessage.success(`已下载 ${quoteAreaSqm.value}㎡ 报价模版`)
+}
+
+function handleExportQuoteFilled() {
+  exportSemiPackageQuoteFilled(
+    state,
+    scaledSemiPackageTemplate.value,
+    `半包预算报价-${quoteAreaSqm.value}㎡.xlsx`
+  )
+  ElMessage.success('已导出当前报价')
+}
+
+function triggerQuoteImport() {
+  quoteFileInputRef.value?.click()
+}
+
+async function handleQuoteFileChange(event) {
+  const file = event.target.files?.[0]
+  event.target.value = ''
+  if (!file) return
+
+  try {
+    await ElMessageBox.confirm(
+      '导入将更新尚未记账的规划单价，并写入整体规划（若模版底部已填）。是否继续？',
+      '导入 Excel 报价',
+      {
+        type: 'info',
+        confirmButtonText: '确认导入',
+        cancelButtonText: '取消',
+      }
+    )
+  } catch {
+    return
+  }
+
+  try {
+    const buffer = await file.arrayBuffer()
+    const parsed = parseSemiPackageQuoteFile(buffer)
+    const { importedCount, skippedCount } = importSemiPackageQuote(parsed)
+    templateDetailVisible.value = false
+    detailExpanded.value = true
+    const warn =
+      parsed.errors.length > 0 ? `（${parsed.errors.length} 行格式略有问题已跳过）` : ''
+    const skipText = skippedCount > 0 ? `，${skippedCount} 项因已有记账未覆盖` : ''
+    ElMessage.success(`已导入 ${importedCount} 项报价${skipText}${warn}`)
+    nextTick(() => {
+      document.querySelector('.detail-summary-card')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
+  } catch (error) {
+    ElMessage.error(error.message || '导入失败，请检查 Excel 格式')
   }
 }
 
@@ -1034,6 +1311,113 @@ function remove(id) {
 .readonly-value {
   font-weight: 600;
   color: var(--reno-primary);
+}
+.template-ref-card {
+  margin-top: 12px;
+}
+.template-area-input {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.template-area-input :deep(.el-input-number) {
+  width: 96px;
+}
+.template-area-unit {
+  font-size: 13px;
+  color: #606266;
+  font-weight: 600;
+}
+.template-ref-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.template-ref-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #303133;
+  margin-bottom: 6px;
+}
+.template-ref-desc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #909399;
+}
+.template-ref-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.template-ref-stat {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #faf7f4;
+}
+.template-ref-stat-label {
+  display: block;
+  font-size: 12px;
+  color: #909399;
+  margin-bottom: 4px;
+}
+.template-ref-stat-value {
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--reno-primary);
+}
+.template-ref-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.template-quote-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px dashed #ebeef5;
+}
+.template-quote-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #606266;
+  margin-right: 4px;
+}
+.quote-file-input {
+  display: none;
+}
+.template-dialog-desc {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #909399;
+  line-height: 1.5;
+}
+.template-breakdown-list {
+  border: 1px solid #ebeef5;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.template-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 14px;
+  border-bottom: 1px solid #f2f6fc;
+}
+.template-breakdown-row:last-child {
+  border-bottom: none;
+}
+.template-breakdown-total {
+  font-weight: 600;
+  background: #faf7f4;
+  color: #303133;
 }
 @media (max-width: 640px) {
   .detail-summary-grid {

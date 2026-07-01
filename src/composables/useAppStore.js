@@ -39,6 +39,11 @@ import {
 } from '../utils/materialBudgetSync'
 import { fetchProjectData, upsertProjectData } from '../utils/cloudStorage'
 import {
+  applySemiPackageBudgetTemplate as applySemiPackageTemplate,
+  clearSemiPackageBudgetTemplate as clearSemiPackageTemplate,
+  applyQuoteImportFromRows,
+} from '../utils/applySemiPackageTemplate'
+import {
   isCloudConfigured,
   getProjectIdFromUrl,
   buildShareUrl,
@@ -863,6 +868,24 @@ export function useAppStore() {
     return true
   }
 
+  function applySemiPackageBudgetTemplate(options, template) {
+    const result = applySemiPackageTemplate(state, template, options)
+    persist()
+    return result
+  }
+
+  function clearSemiPackageBudgetTemplate(template) {
+    const result = clearSemiPackageTemplate(state, template)
+    persist()
+    return result
+  }
+
+  function importSemiPackageQuote(parsed) {
+    const result = applyQuoteImportFromRows(state, parsed)
+    persist()
+    return result
+  }
+
   function getProcessDays(process) {
     return calcConstructionDays(process.startDate, process.endDate)
   }
@@ -896,6 +919,9 @@ export function useAppStore() {
     addBudget,
     updateBudget,
     deleteBudget,
+    applySemiPackageBudgetTemplate,
+    clearSemiPackageBudgetTemplate,
+    importSemiPackageQuote,
     getProcessDays,
   }
 }
