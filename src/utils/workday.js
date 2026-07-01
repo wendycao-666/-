@@ -1,27 +1,14 @@
 import { addDays, formatDate } from './date'
+import { isExtraWorkday, isPublicHoliday } from '../constants/chinaPublicHolidays'
 
-/** 2026年法定节假日（国务院安排） */
-const HOLIDAYS_2026 = new Set([
-  '2026-01-01', '2026-01-02', '2026-01-03',
-  '2026-02-15', '2026-02-16', '2026-02-17', '2026-02-18', '2026-02-19',
-  '2026-02-20', '2026-02-21', '2026-02-22', '2026-02-23',
-  '2026-04-04', '2026-04-05', '2026-04-06',
-  '2026-05-01', '2026-05-02', '2026-05-03', '2026-05-04', '2026-05-05',
-  '2026-06-19', '2026-06-20', '2026-06-21',
-  '2026-09-25', '2026-09-26', '2026-09-27',
-  '2026-10-01', '2026-10-02', '2026-10-03', '2026-10-04',
-  '2026-10-05', '2026-10-06', '2026-10-07',
-])
-
-/** 2026年调休上班日 */
-const EXTRA_WORKDAYS_2026 = new Set([
-  '2026-01-04', '2026-02-14', '2026-02-28',
-  '2026-05-09', '2026-09-20', '2026-10-10',
-])
-
+/**
+ * 是否为施工工作日（工序排期用）
+ * 排除周末与法定节假日；调休上班日视为可施工。
+ * 未配置年份仅按周末判断。
+ */
 export function isWorkday(dateStr) {
-  if (EXTRA_WORKDAYS_2026.has(dateStr)) return true
-  if (HOLIDAYS_2026.has(dateStr)) return false
+  if (isExtraWorkday(dateStr)) return true
+  if (isPublicHoliday(dateStr)) return false
   const day = new Date(`${dateStr}T12:00:00`).getDay()
   return day !== 0 && day !== 6
 }
@@ -73,4 +60,16 @@ export function buildSubtaskSchedule(parentStart, subtasks) {
 
 export function todayStrSafe() {
   return formatDate(new Date())
+}
+
+/** 起止日之间（含首尾）的施工工作日数 */
+export function countWorkdaysInclusive(startDate, endDate) {
+  if (!startDate || !endDate || endDate < startDate) return 0
+  let count = 0
+  let current = startDate
+  while (current <= endDate) {
+    if (isWorkday(current)) count += 1
+    current = addDays(current, 1)
+  }
+  return count
 }

@@ -1,13 +1,16 @@
 export const STORAGE_KEY = 'decoration_tool_data'
 
-/** 排期版本：变更后自动刷新工序默认日期 */
-export const SCHEDULE_VERSION = 2
+/** 排期版本：变更后自动刷新工序默认日期（3=补充2027年节假日） */
+export const SCHEDULE_VERSION = 3
 
 /** 数据结构版本：升级后自动补全采购等字段并写回本地/云端 */
 export const DATA_VERSION = 13
 
-/** 计划开工日 */
-export const PROJECT_START_DATE = '2026-07-13'
+/** 默认计划开工日（可在项目信息中修改） */
+export const DEFAULT_PROJECT_START_DATE = '2026-07-13'
+
+/** @deprecated 请使用 DEFAULT_PROJECT_START_DATE */
+export const PROJECT_START_DATE = DEFAULT_PROJECT_START_DATE
 
 /** 各工序施工工作日（不含周末与法定节假日） */
 export const PROCESS_WORKDAYS = {

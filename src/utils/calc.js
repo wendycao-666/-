@@ -1,10 +1,13 @@
 import { ACCEPTANCE_STATUS, WARNING_STATUS, OVERALL_BUDGET, LABOR_BUDGET_CATEGORY } from '../constants'
-import { addDays, diffDaysInclusive, todayStr, daysBetween } from './date'
+import { addDays, todayStr, daysBetween } from './date'
+import { countWorkdaysInclusive } from './workday'
 
+/** 工序施工天数：起止日之间的工作日（含首尾，排除周末与法定节假日） */
 export function calcConstructionDays(startDate, endDate) {
-  return diffDaysInclusive(startDate, endDate)
+  return countWorkdaysInclusive(startDate, endDate)
 }
 
+/** 采购最晚下单日：按自然日提前，不考虑周末/节假日 */
 export function calcLatestOrderDate(processStartDate, advanceDays) {
   if (!processStartDate) return ''
   return addDays(processStartDate, -advanceDays)

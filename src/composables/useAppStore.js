@@ -50,8 +50,13 @@ import {
   setProjectIdInUrl,
 } from '../utils/projectSync'
 
-function createDefaultProcesses() {
-  const schedule = buildProcessSchedule(PROJECT_START_DATE, PROCESS_NAMES, PROCESS_WORKDAYS)
+function getProjectStartDate(house) {
+  const date = house?.projectStartDate
+  return date && /^\d{4}-\d{2}-\d{2}$/.test(String(date)) ? String(date) : PROJECT_START_DATE
+}
+
+function createDefaultProcesses(startDate = PROJECT_START_DATE) {
+  const schedule = buildProcessSchedule(startDate, PROCESS_NAMES, PROCESS_WORKDAYS)
   return schedule.map((item, index) => ({
     id: String(index + 1),
     name: item.name,
@@ -62,8 +67,8 @@ function createDefaultProcesses() {
   }))
 }
 
-function applyScheduleToProcesses(processes) {
-  const schedule = buildProcessSchedule(PROJECT_START_DATE, PROCESS_NAMES, PROCESS_WORKDAYS)
+function applyScheduleToProcesses(processes, startDate = PROJECT_START_DATE) {
+  const schedule = buildProcessSchedule(startDate, PROCESS_NAMES, PROCESS_WORKDAYS)
   const scheduleMap = Object.fromEntries(schedule.map((item) => [item.name, item]))
   return processes.map((process) => {
     const planned = scheduleMap[process.name]
@@ -266,11 +271,16 @@ function applyLaborBudgetPayload(item) {
 }
 
 function createDefaultState() {
-  const processes = createDefaultProcesses()
+  const processes = createDefaultProcesses(PROJECT_START_DATE)
   const materials = refreshAllMaterials(createDefaultMaterials(), processes)
   const procurementLists = refreshAllProcurementLists(createDefaultProcurementLists(), processes)
   return {
-    house: { area: '', address: '', overallBudget: OVERALL_BUDGET },
+    house: {
+      area: '',
+      address: '',
+      overallBudget: OVERALL_BUDGET,
+      projectStartDate: PROJECT_START_DATE,
+    },
     processes,
     materials,
     procurementLists,
@@ -451,9 +461,13 @@ function applySavedData(saved) {
     state.house.overallBudget = OVERALL_BUDGET
     migrated = true
   }
-  state.processes = saved.processes || createDefaultProcesses()
+  if (!state.house.projectStartDate) {
+    state.house.projectStartDate = PROJECT_START_DATE
+    migrated = true
+  }
+  state.processes = saved.processes || createDefaultProcesses(getProjectStartDate(state.house))
   if (!saved.scheduleVersion || saved.scheduleVersion < SCHEDULE_VERSION) {
-    state.processes = applyScheduleToProcesses(state.processes)
+    state.processes = applyScheduleToProcesses(state.processes, getProjectStartDate(state.house))
     migrated = true
   }
   state.materials = refreshAllMaterials(
@@ -671,6 +685,7 @@ function recalcMaterialsForProcess(processName) {
 export function useAppStore() {
   const progress = computed(() => calcProgress(state.processes))
   const overallBudget = computed(() => Number(state.house.overallBudget) || OVERALL_BUDGET)
+  const projectStartDate = computed(() => getProjectStartDate(state.house))
   const budgetSummary = computed(() => calcBudgetSummary(state.budgets, overallBudget.value))
   const materialStats = computed(() => calcMaterialStats(state.materials))
   const procurementWarningStats = computed(() =>
@@ -721,10 +736,20 @@ export function useAppStore() {
   }
 
   function updateHouse(data) {
+    const prevStart = getProjectStartDate(state.house)
     state.house.area = data.area
     state.house.address = data.address
     if (data.overallBudget !== undefined) {
       state.house.overallBudget = Number(data.overallBudget) || OVERALL_BUDGET
+    }
+    if (data.projectStartDate !== undefined) {
+      state.house.projectStartDate = data.projectStartDate || PROJECT_START_DATE
+    }
+    const nextStart = getProjectStartDate(state.house)
+    if (data.projectStartDate !== undefined && prevStart !== nextStart) {
+      state.processes = applyScheduleToProcesses(state.processes, nextStart)
+      refreshProcurementSchedule()
+      syncAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
     }
     persist()
   }
@@ -895,6 +920,7 @@ export function useAppStore() {
     syncMeta,
     progress,
     overallBudget,
+    projectStartDate,
     budgetSummary,
     materialStats,
     procurementWarningStats,

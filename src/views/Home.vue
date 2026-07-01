@@ -148,6 +148,15 @@
 
     <el-dialog v-model="houseDialogVisible" title="编辑项目信息" width="90%" style="max-width: 420px">
       <el-form label-width="96px">
+        <el-form-item label="计划开工日" required>
+          <el-date-picker
+            v-model="houseForm.projectStartDate"
+            type="date"
+            value-format="YYYY-MM-DD"
+            placeholder="选择开工日期"
+            style="width: 100%"
+          />
+        </el-form-item>
         <el-form-item label="房屋面积">
           <el-input v-model="houseForm.area" placeholder="请输入面积（㎡）" />
         </el-form-item>
@@ -176,7 +185,7 @@
 import { ref, reactive, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { useRouter } from 'vue-router'
-import { ROUTES, OVERALL_BUDGET, COLORS, WARNING_STATUS } from '../constants'
+import { ROUTES, OVERALL_BUDGET, COLORS, WARNING_STATUS, PROJECT_START_DATE } from '../constants'
 import { formatMoney, formatOverBudgetMessage } from '../utils/format'
 import { useAppStore } from '../composables/useAppStore'
 import { getCurrentProcessInfo } from '../utils/calc'
@@ -201,7 +210,12 @@ const {
 
 const houseDialogVisible = ref(false)
 const cloudDialogVisible = ref(false)
-const houseForm = reactive({ area: '', address: '', overallBudget: OVERALL_BUDGET })
+const houseForm = reactive({
+  area: '',
+  address: '',
+  overallBudget: OVERALL_BUDGET,
+  projectStartDate: PROJECT_START_DATE,
+})
 const moreExpanded = ref([])
 
 const currentProgress = computed(() => getCurrentProcessInfo(state.processes))
@@ -222,6 +236,7 @@ const houseMeta = computed(() => {
   const parts = []
   if (state.house.area) parts.push(`${state.house.area} ㎡`)
   else parts.push('面积未填')
+  parts.push(`开工 ${state.house.projectStartDate || PROJECT_START_DATE}`)
   parts.push(`总预算 ¥ ${formatMoney(overallBudget.value)}`)
   return parts.join(' · ')
 })
@@ -236,6 +251,7 @@ function openHouseDialog() {
   houseForm.area = state.house.area
   houseForm.address = state.house.address
   houseForm.overallBudget = Number(state.house.overallBudget) || OVERALL_BUDGET
+  houseForm.projectStartDate = state.house.projectStartDate || PROJECT_START_DATE
   houseDialogVisible.value = true
 }
 
@@ -244,10 +260,15 @@ function submitHouse() {
     ElMessage.warning('请填写有效的装修总预算')
     return
   }
+  if (!houseForm.projectStartDate) {
+    ElMessage.warning('请选择计划开工日')
+    return
+  }
   updateHouse({
     area: houseForm.area.trim(),
     address: houseForm.address.trim(),
     overallBudget: Number(houseForm.overallBudget),
+    projectStartDate: houseForm.projectStartDate,
   })
   houseDialogVisible.value = false
 }
