@@ -227,10 +227,12 @@ function createDefaultBudgets() {
 }
 
 function hasBudgetActivity(item) {
+  const note = String(item.note || '').trim()
   return (
     Number(item.unitPrice || 0) > 0 ||
     Number(item.actualAmount || 0) > 0 ||
-    Number(item.paidAmount || 0) > 0
+    Number(item.paidAmount || 0) > 0 ||
+    note.length > 0
   )
 }
 
