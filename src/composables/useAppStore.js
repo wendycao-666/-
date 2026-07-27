@@ -18,6 +18,8 @@ import {
   LABOR_BUDGET_CATEGORY,
   LABOR_BUDGET_TEMPLATES,
   OVERALL_BUDGET,
+  SEMI_PACKAGE_BUDGET_CATEGORY,
+  SEMI_PACKAGE_BUDGET_ITEM,
 } from '../constants'
 import { loadData, saveData } from '../utils/storage'
 import { todayStr } from '../utils/date'
@@ -43,6 +45,8 @@ import {
   clearSemiPackageBudgetTemplate as clearSemiPackageTemplate,
   applyQuoteImportFromRows,
 } from '../utils/applySemiPackageTemplate'
+import { applyUserQuotePreset } from '../utils/applyUserQuotePreset'
+import { USER_QUOTE_VERSION } from '../constants/userQuotePreset'
 import {
   isCloudConfigured,
   getProjectIdFromUrl,
@@ -175,6 +179,20 @@ function loadProcurementLists(saved) {
   return { lists: defaults, migrated }
 }
 
+function createDefaultSemiPackageBudget() {
+  return {
+    id: 'semi-package-init-1',
+    category: SEMI_PACKAGE_BUDGET_CATEGORY,
+    name: SEMI_PACKAGE_BUDGET_ITEM.name,
+    note: SEMI_PACKAGE_BUDGET_ITEM.note,
+    unitPrice: 0,
+    quantity: 1,
+    actualAmount: 0,
+    paidAmount: 0,
+    semiPackageInit: true,
+  }
+}
+
 function createDefaultMiscBudgets() {
   return MISC_BUDGET_TEMPLATES.map((item, index) => ({
     id: `misc-init-${index + 1}`,
@@ -205,7 +223,53 @@ function createDefaultLaborBudgets() {
 }
 
 function createDefaultBudgets() {
-  return [...createDefaultMiscBudgets(), ...createDefaultLaborBudgets()]
+  return [createDefaultSemiPackageBudget()]
+}
+
+function hasBudgetActivity(item) {
+  return (
+    Number(item.unitPrice || 0) > 0 ||
+    Number(item.actualAmount || 0) > 0 ||
+    Number(item.paidAmount || 0) > 0
+  )
+}
+
+/** v15：半包整体付费单列；移除无记账的工序人工/杂项占位 */
+function migrateSemiPackageWholeFeeBudgets(budgets) {
+  let next = [...budgets]
+  let changed = false
+
+  const emptyPlaceholders = next.filter(
+    (item) =>
+      (item.laborInit || item.miscInit) &&
+      !hasBudgetActivity(item)
+  )
+  if (emptyPlaceholders.length) {
+    const removeIds = new Set(emptyPlaceholders.map((item) => item.id))
+    next = next.filter((item) => !removeIds.has(item.id))
+    changed = true
+  }
+
+  let semi = next.find(
+    (item) =>
+      item.category === SEMI_PACKAGE_BUDGET_CATEGORY &&
+      (item.semiPackageInit || item.name === SEMI_PACKAGE_BUDGET_ITEM.name)
+  )
+  if (!semi) {
+    next.unshift(createDefaultSemiPackageBudget())
+    changed = true
+  } else {
+    if (!semi.semiPackageInit) {
+      semi.semiPackageInit = true
+      changed = true
+    }
+    if (!semi.note) {
+      semi.note = SEMI_PACKAGE_BUDGET_ITEM.note
+      changed = true
+    }
+  }
+
+  return { budgets: next, migrated: changed }
 }
 
 function mergeLaborBudgetInit(budgets) {
@@ -307,6 +371,7 @@ function serializeState() {
   return {
     dataVersion: DATA_VERSION,
     scheduleVersion: SCHEDULE_VERSION,
+    userQuoteVersion: USER_QUOTE_VERSION,
     house: { ...state.house },
     processes: state.processes.map((p) => ({ ...p })),
     materials: state.materials.map((m) => ({ ...m })),
@@ -503,15 +568,21 @@ function applySavedData(saved) {
     migrated = true
   }
   const miscSourceLists = !saved.dataVersion || saved.dataVersion < 5 ? rawSavedLists : null
-  const mergedBudgets = mergeMiscBudgetInit(state.budgets, miscSourceLists)
-  if (mergedBudgets !== state.budgets || miscSourceLists) {
-    state.budgets = mergedBudgets
-    if (!saved.dataVersion || saved.dataVersion < 5) migrated = true
+  if (!saved.dataVersion || saved.dataVersion < 15) {
+    const mergedBudgets = mergeMiscBudgetInit(state.budgets, miscSourceLists)
+    if (mergedBudgets !== state.budgets || miscSourceLists) {
+      state.budgets = mergedBudgets
+      if (!saved.dataVersion || saved.dataVersion < 5) migrated = true
+    }
   }
-  const mergedLaborBudgets = mergeLaborBudgetInit(state.budgets)
   if (!saved.dataVersion || saved.dataVersion < 13) {
-    state.budgets = normalizeBudgets(mergedLaborBudgets)
+    state.budgets = normalizeBudgets(mergeLaborBudgetInit(state.budgets))
     migrated = true
+  }
+  {
+    const migratedSemi = migrateSemiPackageWholeFeeBudgets(state.budgets)
+    state.budgets = normalizeBudgets(migratedSemi.budgets)
+    if (migratedSemi.migrated || !saved.dataVersion || saved.dataVersion < 15) migrated = true
   }
   state.lastWarningRefreshDate = saved.lastWarningRefreshDate || todayStr()
   if (!saved.dataVersion || saved.dataVersion < 7) {
@@ -527,6 +598,12 @@ function applySavedData(saved) {
   }
   syncAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
   cleanupAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
+
+  if (!saved.userQuoteVersion || saved.userQuoteVersion < USER_QUOTE_VERSION) {
+    applyUserQuotePreset(state)
+    migrated = true
+  }
+
   return migrated
 }
 
@@ -782,6 +859,10 @@ export function useAppStore() {
     const item = items.find((entry) => entry.id === id)
     if (!item) return
     Object.assign(item, data)
+    if (item.actualOrderDate && item.purchaseStatus === PURCHASE_STATUS.PENDING) {
+      item.purchaseStatus = PURCHASE_STATUS.ORDERED
+    }
+    state.procurementLists = refreshAllProcurementLists(state.procurementLists, state.processes)
     syncAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
     persist()
   }
@@ -911,6 +992,12 @@ export function useAppStore() {
     return result
   }
 
+  function importUserQuoteEstimates() {
+    const result = applyUserQuotePreset(state)
+    persist()
+    return result
+  }
+
   function getProcessDays(process) {
     return calcConstructionDays(process.startDate, process.endDate)
   }
@@ -948,6 +1035,7 @@ export function useAppStore() {
     applySemiPackageBudgetTemplate,
     clearSemiPackageBudgetTemplate,
     importSemiPackageQuote,
+    importUserQuoteEstimates,
     getProcessDays,
   }
 }

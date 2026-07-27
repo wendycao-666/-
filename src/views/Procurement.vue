@@ -1,11 +1,16 @@
 <template>
   <div class="page procurement-page">
 
-    <ProcurementWarningBar
-      :stats="procurementWarningStats"
-      :active-filter="warningFilter"
-      @select="onWarningSelect"
-    />
+    <div class="procurement-toolbar">
+      <ProcurementWarningBar
+        :stats="procurementWarningStats"
+        :active-filter="warningFilter"
+        @select="onWarningSelect"
+      />
+      <el-button round size="small" type="primary" plain @click="handleImportQuoteEstimates">
+        导入预估报价
+      </el-button>
+    </div>
 
     <PhaseProcurementPanel @select="onPhaseItemSelect" />
 
@@ -147,7 +152,8 @@ import EmptyState from '../components/EmptyState.vue'
 
 const route = useRoute()
 const router = useRouter()
-const { state, updateProcurementItem, refreshWarningsIfNeeded, procurementWarningStats } = useAppStore()
+const { state, updateProcurementItem, refreshWarningsIfNeeded, procurementWarningStats, importUserQuoteEstimates } =
+  useAppStore()
 
 const materialNameOrder = getMaterialNameOrder()
 const materialHighlightId = ref('')
@@ -160,7 +166,20 @@ const filterSectionRef = ref(null)
 onMounted(() => {
   refreshWarningsIfNeeded()
   applyFiltersFromQuery()
+  const { filledCount } = importUserQuoteEstimates()
+  if (filledCount > 0) {
+    ElMessage.success(`已自动导入 ${filledCount} 项预估报价`)
+  }
 })
+
+function handleImportQuoteEstimates() {
+  const { filledCount } = importUserQuoteEstimates()
+  if (filledCount > 0) {
+    ElMessage.success(`已导入 ${filledCount} 项预估报价到规划单价`)
+  } else {
+    ElMessage.info('没有可导入的项（已有规划价或记账的不会覆盖）')
+  }
+}
 
 watch(
   () => [route.query.warning, route.query.process, route.query.tab],
@@ -406,6 +425,17 @@ function normalizePayload(item) {
 </script>
 
 <style scoped>
+.procurement-toolbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.procurement-toolbar :deep(.procurement-warning-bar) {
+  flex: 1;
+  min-width: 0;
+}
 .warning-filter-view,
 .urgency-view,
 .category-view {

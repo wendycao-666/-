@@ -1,4 +1,10 @@
-import { LABOR_BUDGET_CATEGORY, LABOR_BUDGET_TEMPLATES, OVERALL_BUDGET } from '../constants'
+import {
+  LABOR_BUDGET_CATEGORY,
+  LABOR_BUDGET_TEMPLATES,
+  OVERALL_BUDGET,
+  SEMI_PACKAGE_BUDGET_CATEGORY,
+  SEMI_PACKAGE_BUDGET_ITEM,
+} from '../constants'
 import { SEMI_PACKAGE_BUDGET_TEMPLATE } from '../constants/semiPackageBudgetTemplate.js'
 import { syncAllProcurementBudgets } from './materialBudgetSync.js'
 import { CATEGORY_TO_PROCUREMENT_KEY } from './semiPackageQuoteExcel.js'
@@ -56,6 +62,44 @@ function applyDesignReference(budgets, designItems) {
     filled += 1
   })
   return filled
+}
+
+function applySemiPackageFeeReference(budgets, semiPackageItem) {
+  if (!semiPackageItem) return 0
+  const name = semiPackageItem.name || SEMI_PACKAGE_BUDGET_ITEM.name
+  let budget = budgets.find((b) => b.category === SEMI_PACKAGE_BUDGET_CATEGORY && b.name === name)
+  if (!budget) {
+    budget = budgets.find((b) => b.category === SEMI_PACKAGE_BUDGET_CATEGORY && b.semiPackageInit)
+  }
+  if (budget) {
+    if (isUnsetPlanning(budget.unitPrice, budget.actualAmount, budget.paidAmount)) {
+      if (Number(semiPackageItem.unitPrice || 0) > 0) {
+        budget.unitPrice = semiPackageItem.unitPrice
+        budget.quantity = semiPackageItem.quantity ?? 1
+        markSemiPackageRef(budget)
+        return 1
+      }
+      budget.note = budget.note || semiPackageItem.note || SEMI_PACKAGE_BUDGET_ITEM.note
+      return 0
+    }
+    if (shouldTreatAsTemplateRef(budget, semiPackageItem)) {
+      markSemiPackageRef(budget)
+    }
+    return 0
+  }
+  budgets.unshift({
+    id: crypto.randomUUID(),
+    category: SEMI_PACKAGE_BUDGET_CATEGORY,
+    name,
+    note: semiPackageItem.note || SEMI_PACKAGE_BUDGET_ITEM.note,
+    unitPrice: Number(semiPackageItem.unitPrice || 0),
+    quantity: semiPackageItem.quantity ?? 1,
+    actualAmount: 0,
+    paidAmount: 0,
+    semiPackageInit: true,
+    semiPackageRef: Number(semiPackageItem.unitPrice || 0) > 0,
+  })
+  return Number(semiPackageItem.unitPrice || 0) > 0 ? 1 : 0
 }
 
 function applyLaborReference(budgets, laborItems) {
@@ -246,6 +290,31 @@ function countClearableProcurement(procurementLists, procurementPrices) {
   return count
 }
 
+function countClearableSemiPackageFee(budgets, semiPackageItem) {
+  if (!semiPackageItem || Number(semiPackageItem.unitPrice || 0) <= 0) return 0
+  const name = semiPackageItem.name || SEMI_PACKAGE_BUDGET_ITEM.name
+  const budget = budgets.find(
+    (b) =>
+      b.category === SEMI_PACKAGE_BUDGET_CATEGORY &&
+      (b.name === name || b.semiPackageInit)
+  )
+  return budget && shouldTreatAsTemplateRef(budget, semiPackageItem) ? 1 : 0
+}
+
+function clearSemiPackageFeeReference(budgets, semiPackageItem) {
+  if (!semiPackageItem) return 0
+  const name = semiPackageItem.name || SEMI_PACKAGE_BUDGET_ITEM.name
+  const budget = budgets.find(
+    (b) =>
+      b.category === SEMI_PACKAGE_BUDGET_CATEGORY &&
+      (b.name === name || b.semiPackageInit)
+  )
+  if (!budget || !shouldTreatAsTemplateRef(budget, semiPackageItem)) return 0
+  budget.unitPrice = 0
+  delete budget.semiPackageRef
+  return 1
+}
+
 /** 是否仍有可清除的参考价 */
 export function hasSemiPackageReference(state, template = SEMI_PACKAGE_BUDGET_TEMPLATE) {
   if (state.house?.semiPackageOverallRef) return true
@@ -256,11 +325,12 @@ export function hasSemiPackageReference(state, template = SEMI_PACKAGE_BUDGET_TE
 export function countClearableSemiPackageRefs(state, template = SEMI_PACKAGE_BUDGET_TEMPLATE) {
   let count = 0
   if (state.house?.semiPackageOverallRef) count += 1
-  count += countClearableDesign(state.budgets, template.design)
-  count += countClearableLabor(state.budgets, template.labor)
-  count += countClearableMisc(state.budgets, template.misc)
-  count += countClearableMaterials(state.materials, template.materials)
-  count += countClearableProcurement(state.procurementLists, template.procurement)
+  count += countClearableDesign(state.budgets, template.design || [])
+  count += countClearableSemiPackageFee(state.budgets, template.semiPackage)
+  count += countClearableLabor(state.budgets, template.labor || [])
+  count += countClearableMisc(state.budgets, template.misc || [])
+  count += countClearableMaterials(state.materials, template.materials || {})
+  count += countClearableProcurement(state.procurementLists, template.procurement || {})
   return count
 }
 
@@ -282,11 +352,12 @@ export function applySemiPackageBudgetTemplate(
     overallBudgetUpdated = true
   }
 
-  filledCount += applyDesignReference(state.budgets, template.design)
-  filledCount += applyLaborReference(state.budgets, template.labor)
-  filledCount += applyMiscReference(state.budgets, template.misc)
-  filledCount += applyMaterialReference(state.materials, template.materials)
-  filledCount += applyProcurementReference(state.procurementLists, template.procurement)
+  filledCount += applyDesignReference(state.budgets, template.design || [])
+  filledCount += applySemiPackageFeeReference(state.budgets, template.semiPackage)
+  filledCount += applyLaborReference(state.budgets, template.labor || [])
+  filledCount += applyMiscReference(state.budgets, template.misc || [])
+  filledCount += applyMaterialReference(state.materials, template.materials || {})
+  filledCount += applyProcurementReference(state.procurementLists, template.procurement || {})
 
   syncAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
   propagateSemiPackageRefToBudgets(state)
@@ -345,6 +416,9 @@ function applyQuoteRow(state, row) {
   if (row.category === '设计') {
     return applyQuoteToDesign(state.budgets, row)
   }
+  if (row.category === SEMI_PACKAGE_BUDGET_CATEGORY || row.category === '半包') {
+    return applyQuoteToSemiPackage(state.budgets, row)
+  }
   if (row.category === '人工') {
     return applyQuoteToLabor(state.budgets, row)
   }
@@ -376,6 +450,36 @@ function applyQuoteToDesign(budgets, row) {
     quantity: row.quantity,
     actualAmount: 0,
     paidAmount: 0,
+    semiPackageRef: true,
+  })
+  return 'imported'
+}
+
+function applyQuoteToSemiPackage(budgets, row) {
+  let budget = budgets.find(
+    (b) =>
+      b.category === SEMI_PACKAGE_BUDGET_CATEGORY &&
+      (b.name === row.name || b.semiPackageInit || b.name === SEMI_PACKAGE_BUDGET_ITEM.name)
+  )
+  if (budget) {
+    if (hasSpend(budget.actualAmount, budget.paidAmount)) return 'skipped'
+    budget.unitPrice = row.unitPrice
+    budget.quantity = row.quantity
+    budget.name = row.name || budget.name
+    if (row.note) budget.note = row.note
+    markSemiPackageRef(budget)
+    return 'imported'
+  }
+  budgets.unshift({
+    id: crypto.randomUUID(),
+    category: SEMI_PACKAGE_BUDGET_CATEGORY,
+    name: row.name || SEMI_PACKAGE_BUDGET_ITEM.name,
+    note: row.note || SEMI_PACKAGE_BUDGET_ITEM.note,
+    unitPrice: row.unitPrice,
+    quantity: row.quantity,
+    actualAmount: 0,
+    paidAmount: 0,
+    semiPackageInit: true,
     semiPackageRef: true,
   })
   return 'imported'
@@ -446,11 +550,12 @@ export function clearSemiPackageBudgetTemplate(state, template = SEMI_PACKAGE_BU
     clearedCount += 1
   }
 
-  clearedCount += clearDesignReference(state.budgets, template.design)
-  clearedCount += clearLaborReference(state.budgets, template.labor)
-  clearedCount += clearMiscReference(state.budgets, template.misc)
-  clearedCount += clearMaterialReference(state.materials, template.materials)
-  clearedCount += clearProcurementReference(state.procurementLists, template.procurement)
+  clearedCount += clearDesignReference(state.budgets, template.design || [])
+  clearedCount += clearSemiPackageFeeReference(state.budgets, template.semiPackage)
+  clearedCount += clearLaborReference(state.budgets, template.labor || [])
+  clearedCount += clearMiscReference(state.budgets, template.misc || [])
+  clearedCount += clearMaterialReference(state.materials, template.materials || {})
+  clearedCount += clearProcurementReference(state.procurementLists, template.procurement || {})
 
   syncAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
 

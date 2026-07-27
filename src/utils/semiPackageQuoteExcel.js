@@ -5,6 +5,8 @@ import {
   MATERIAL_TEMPLATES,
   PROCUREMENT_CATEGORY_TEMPLATES,
   PROCUREMENT_CATEGORIES,
+  SEMI_PACKAGE_BUDGET_CATEGORY,
+  SEMI_PACKAGE_BUDGET_ITEM,
 } from '../constants/index.js'
 import { SEMI_PACKAGE_BUDGET_TEMPLATE } from '../constants/semiPackageBudgetTemplate.js'
 
@@ -43,11 +45,32 @@ export function buildQuoteSheetRows(state = null, refTemplate = SEMI_PACKAGE_BUD
     })
   })
 
+  const semiRef = refTemplate.semiPackage || {
+    ...SEMI_PACKAGE_BUDGET_ITEM,
+    unitPrice: 0,
+    quantity: 1,
+  }
+  const semiBudget = state?.budgets?.find(
+    (b) =>
+      b.category === SEMI_PACKAGE_BUDGET_CATEGORY &&
+      (b.semiPackageInit || b.name === semiRef.name || b.name === SEMI_PACKAGE_BUDGET_ITEM.name)
+  )
+  rows.push({
+    category: SEMI_PACKAGE_BUDGET_CATEGORY,
+    name: semiBudget?.name || semiRef.name || SEMI_PACKAGE_BUDGET_ITEM.name,
+    processName: '',
+    unitPrice: pickExportPrice(semiBudget, semiRef),
+    referencePrice: pickReferencePrice(semiRef),
+    quantity: Number(semiBudget?.quantity ?? semiRef.quantity ?? 1) || 1,
+    note: semiBudget?.note || semiRef.note || SEMI_PACKAGE_BUDGET_ITEM.note,
+  })
+
   LABOR_BUDGET_TEMPLATES.forEach((labor) => {
-    const ref = refTemplate.labor.find((entry) => entry.processName === labor.processName)
+    const ref = (refTemplate.labor || []).find((entry) => entry.processName === labor.processName)
     const budget = state?.budgets?.find(
       (b) => b.category === '人工' && b.processName === labor.processName
     )
+    if (!budget && !ref) return
     rows.push({
       category: '人工',
       name: labor.name,
@@ -60,8 +83,9 @@ export function buildQuoteSheetRows(state = null, refTemplate = SEMI_PACKAGE_BUD
   })
 
   MISC_BUDGET_TEMPLATES.forEach((misc) => {
-    const ref = refTemplate.misc.find((entry) => entry.name === misc.name)
+    const ref = (refTemplate.misc || []).find((entry) => entry.name === misc.name)
     const budget = state?.budgets?.find((b) => b.category === '杂项' && b.name === misc.name)
+    if (!budget && !ref) return
     rows.push({
       category: '杂项',
       name: misc.name,
@@ -74,7 +98,7 @@ export function buildQuoteSheetRows(state = null, refTemplate = SEMI_PACKAGE_BUD
   })
 
   MATERIAL_TEMPLATES.forEach((material) => {
-    const ref = refTemplate.materials[material.name]
+    const ref = refTemplate.materials?.[material.name]
     const saved = state?.materials?.find((entry) => entry.name === material.name)
     rows.push({
       category: '主材',
@@ -89,7 +113,7 @@ export function buildQuoteSheetRows(state = null, refTemplate = SEMI_PACKAGE_BUD
 
   PROCUREMENT_CATEGORIES.forEach(({ key, budgetCategory }) => {
     ;(PROCUREMENT_CATEGORY_TEMPLATES[key] || []).forEach((template) => {
-      const ref = refTemplate.procurement[key]?.[template.name]
+      const ref = refTemplate.procurement?.[key]?.[template.name]
       const saved = state?.procurementLists?.[key]?.find((entry) => entry.name === template.name)
       rows.push({
         category: budgetCategory,

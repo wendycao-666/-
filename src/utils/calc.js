@@ -1,4 +1,10 @@
-import { ACCEPTANCE_STATUS, WARNING_STATUS, OVERALL_BUDGET, LABOR_BUDGET_CATEGORY } from '../constants'
+import {
+  ACCEPTANCE_STATUS,
+  WARNING_STATUS,
+  OVERALL_BUDGET,
+  LABOR_BUDGET_CATEGORY,
+  PURCHASE_STATUS,
+} from '../constants'
 import { addDays, todayStr, daysBetween } from './date'
 import { countWorkdaysInclusive } from './workday'
 
@@ -13,7 +19,15 @@ export function calcLatestOrderDate(processStartDate, advanceDays) {
   return addDays(processStartDate, -advanceDays)
 }
 
-export function calcWarningStatus(latestOrderDate, currentDate = todayStr()) {
+/** 已下单/已到货：不再按最晚下单日做逾期/临期预警 */
+export function isProcurementOrdered(item) {
+  if (!item) return false
+  if (item.actualOrderDate) return true
+  return item.purchaseStatus === PURCHASE_STATUS.ORDERED || item.purchaseStatus === PURCHASE_STATUS.ARRIVED
+}
+
+export function calcWarningStatus(latestOrderDate, currentDate = todayStr(), item = null) {
+  if (isProcurementOrdered(item)) return WARNING_STATUS.NORMAL
   if (!latestOrderDate) return WARNING_STATUS.NORMAL
   const remain = daysBetween(currentDate, latestOrderDate)
   if (remain === null) return WARNING_STATUS.NORMAL
@@ -35,9 +49,9 @@ export function calcBudgetItemTotal(unitPrice, quantity) {
   return Number(unitPrice || 0) * Number(quantity || 0)
 }
 
-/** 预算金额或实际费用大于 0，或杂项/人工默认项时在预算管理页展示 */
+/** 预算金额或实际费用大于 0，或半包/杂项/人工默认项时在预算管理页展示 */
 export function isBudgetItemVisible(item) {
-  if (item.miscInit || item.laborInit) return true
+  if (item.miscInit || item.laborInit || item.semiPackageInit) return true
   const budget = calcBudgetItemPlanningAmount(item)
   const actual = Number(item.actualAmount || 0)
   return budget > 0 || actual > 0
@@ -212,7 +226,7 @@ export function refreshMaterialFields(material, processMap) {
   return {
     ...material,
     latestOrderDate,
-    warningStatus: calcWarningStatus(latestOrderDate),
+    warningStatus: calcWarningStatus(latestOrderDate, todayStr(), material),
   }
 }
 

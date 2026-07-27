@@ -3,16 +3,18 @@ import {
   MISC_BUDGET_TEMPLATES,
   MATERIAL_TEMPLATES,
   PROCUREMENT_CATEGORY_TEMPLATES,
+  SEMI_PACKAGE_BUDGET_ITEM,
 } from './index.js'
+import { USER_QUOTE_PRESET } from './userQuotePreset.js'
 
 /** 半包预算参考模版（100㎡，仅供规划参考，可按实际报价调整） */
 export const SEMI_PACKAGE_BUDGET_TEMPLATE = {
-  id: 'semi-package-ref-100sqm-v1',
+  id: 'semi-package-ref-100sqm-v2',
   label: '半包预算参考',
   areaSqm: 100,
   areaHint: '100㎡',
   description:
-    '按 100㎡ 半包常见行情估算：人工由施工方负责，主材与采购项由业主自购。仅填充尚未填写的规划单价，不会覆盖已有花费记录。',
+    '半包工程款为整体付费一项；主材与采购项按截图预估。仅填充尚未填写的规划单价，不会覆盖已有花费记录。',
   overallBudget: 200000,
   design: [
     {
@@ -22,58 +24,15 @@ export const SEMI_PACKAGE_BUDGET_TEMPLATE = {
       quantity: 1,
     },
   ],
-  labor: [
-    { processName: '拆改工程', unitPrice: 6500 },
-    { processName: '水电改造', unitPrice: 13000 },
-    { processName: '泥瓦工程', unitPrice: 20000 },
-    { processName: '木作工程', unitPrice: 15500 },
-    { processName: '油漆工程', unitPrice: 10000 },
-    { processName: '安装阶段', unitPrice: 6500 },
-    { processName: '开荒保洁', unitPrice: 1500 },
-  ],
-  misc: [
-    { name: '拆改', unitPrice: 2200 },
-    { name: '水位', unitPrice: 4200 },
-    { name: '电', unitPrice: 4600 },
-  ],
-  materials: {
-    墙地砖: { unitPrice: 12000, quantity: 1 },
-    室内木门: { unitPrice: 8500, quantity: 1 },
-    橱柜洁具: { unitPrice: 5500, quantity: 1 },
+  /** 半包整体付费，不按工序拆分 */
+  semiPackage: {
+    ...SEMI_PACKAGE_BUDGET_ITEM,
+    ...USER_QUOTE_PRESET.semiPackage,
   },
-  procurement: {
-    base: {
-      封窗: { unitPrice: 9000, quantity: 1 },
-      美缝: { unitPrice: 2800, quantity: 1 },
-    },
-    custom: {
-      全屋定制: { unitPrice: 16000, quantity: 1 },
-      餐边柜: { unitPrice: 4500, quantity: 1 },
-      电视柜: { unitPrice: 3000, quantity: 1 },
-      水吧台: { unitPrice: 2500, quantity: 1 },
-    },
-    bathroom: {
-      浴室盆: { unitPrice: 1800, quantity: 1 },
-      浴具: { unitPrice: 2500, quantity: 1 },
-      马桶: { unitPrice: 2200, quantity: 1 },
-    },
-    kitchen: {
-      燃气热水器: { unitPrice: 3800, quantity: 1 },
-      水槽: { unitPrice: 700, quantity: 1 },
-      烟灶: { unitPrice: 4200, quantity: 1 },
-      洗碗机: { unitPrice: 3800, quantity: 1 },
-      净水器: { unitPrice: 1800, quantity: 1 },
-    },
-    appliance: {
-      平嵌冰箱: { unitPrice: 6500, quantity: 1 },
-      风管机: { unitPrice: 8000, quantity: 1 },
-      洗衣机: { unitPrice: 2500, quantity: 1 },
-      扫地机器人: { unitPrice: 2800, quantity: 1 },
-    },
-    soft: {
-      窗帘: { unitPrice: 3500, quantity: 1 },
-    },
-  },
+  labor: [],
+  misc: [],
+  materials: USER_QUOTE_PRESET.materials,
+  procurement: USER_QUOTE_PRESET.procurement,
 }
 
 /** 基准面积（㎡），模版单价均按此面积测算 */
@@ -139,60 +98,69 @@ export function buildSemiPackageTemplateForArea(
     ...base,
     areaSqm: area,
     areaHint: `${area}㎡`,
-    description: `按 ${area}㎡ 半包常见行情估算：人工由施工方负责，主材与采购项由业主自购。仅填充尚未填写的规划单价，不会覆盖已有花费记录。`,
+    description: `按 ${area}㎡ 估算：半包工程款整体付费；主材与采购项由业主自购。仅填充尚未填写的规划单价，不会覆盖已有花费记录。`,
     overallBudget: Math.round(Number(base.overallBudget || 0) * ratio),
-    design: base.design.map((item) => ({
+    design: (base.design || []).map((item) => ({
       ...item,
       unitPrice: scaleUnitPrice(item.unitPrice, ratio, item.name),
       note: item.note?.replace(/\d+㎡/, `${area}㎡`) || item.note,
     })),
-    labor: base.labor.map((item) => ({
+    semiPackage: base.semiPackage
+      ? {
+          ...base.semiPackage,
+          unitPrice: scaleUnitPrice(base.semiPackage.unitPrice, ratio, base.semiPackage.name),
+        }
+      : null,
+    labor: (base.labor || []).map((item) => ({
       ...item,
       unitPrice: scaleUnitPrice(item.unitPrice, ratio, item.processName),
     })),
-    misc: base.misc.map((item) => ({
+    misc: (base.misc || []).map((item) => ({
       ...item,
       unitPrice: scaleUnitPrice(item.unitPrice, ratio, item.name),
     })),
-    materials: scalePriceMap(base.materials, ratio),
+    materials: scalePriceMap(base.materials || {}, ratio),
     procurement: Object.fromEntries(
-      Object.entries(base.procurement).map(([key, group]) => [key, scalePriceMap(group, ratio)])
+      Object.entries(base.procurement || {}).map(([key, group]) => [key, scalePriceMap(group, ratio)])
     ),
   }
 }
 
 function sumEntries(entries, pickPrice) {
-  return Object.values(entries).reduce((sum, item) => {
+  return Object.values(entries || {}).reduce((sum, item) => {
     const price = typeof pickPrice === 'function' ? pickPrice(item) : Number(item.unitPrice || 0)
     const qty = Number(item.quantity || 1) || 1
     return sum + price * qty
   }, 0)
 }
 
+function calcSemiPackageAmount(template) {
+  const item = template.semiPackage
+  if (!item) return 0
+  return Number(item.unitPrice || 0) * (Number(item.quantity || 1) || 1)
+}
+
 /** 模版规划合计（用于展示） */
 export function calcSemiPackageTemplateTotal(template = SEMI_PACKAGE_BUDGET_TEMPLATE) {
-  const designTotal = template.design.reduce(
+  const designTotal = (template.design || []).reduce(
     (sum, item) => sum + Number(item.unitPrice || 0) * Number(item.quantity || 1),
     0
   )
-  const laborTotal = template.labor.reduce((sum, item) => sum + Number(item.unitPrice || 0), 0)
-  const miscTotal = template.misc.reduce((sum, item) => sum + Number(item.unitPrice || 0), 0)
+  const semiPackageTotal = calcSemiPackageAmount(template)
+  const laborTotal = (template.labor || []).reduce((sum, item) => sum + Number(item.unitPrice || 0), 0)
+  const miscTotal = (template.misc || []).reduce((sum, item) => sum + Number(item.unitPrice || 0), 0)
   const materialTotal = sumEntries(template.materials)
-  const procurementTotal = Object.values(template.procurement).reduce(
+  const procurementTotal = Object.values(template.procurement || {}).reduce(
     (sum, group) => sum + sumEntries(group),
     0
   )
-  return designTotal + laborTotal + miscTotal + materialTotal + procurementTotal
+  return designTotal + semiPackageTotal + laborTotal + miscTotal + materialTotal + procurementTotal
 }
 
 /** 按分类汇总，供明细弹窗展示 */
 export function getSemiPackageTemplateBreakdown(template = SEMI_PACKAGE_BUDGET_TEMPLATE) {
   const procurementByCategory = {}
-  Object.entries(template.procurement).forEach(([listKey, items]) => {
-    const label =
-      Object.keys(PROCUREMENT_CATEGORY_TEMPLATES).includes(listKey)
-        ? listKey
-        : listKey
+  Object.entries(template.procurement || {}).forEach(([listKey, items]) => {
     const categoryLabel =
       {
         base: '基装',
@@ -201,14 +169,24 @@ export function getSemiPackageTemplateBreakdown(template = SEMI_PACKAGE_BUDGET_T
         kitchen: '厨电',
         appliance: '家电',
         soft: '软装',
-      }[listKey] || label
+      }[listKey] || listKey
     procurementByCategory[categoryLabel] = sumEntries(items)
   })
 
   return [
-    { category: '设计', amount: template.design.reduce((s, i) => s + i.unitPrice * (i.quantity || 1), 0) },
-    { category: '人工', amount: template.labor.reduce((s, i) => s + i.unitPrice, 0) },
-    { category: '杂项', amount: template.misc.reduce((s, i) => s + i.unitPrice, 0) },
+    {
+      category: '设计',
+      amount: (template.design || []).reduce((s, i) => s + i.unitPrice * (i.quantity || 1), 0),
+    },
+    { category: '半包', amount: calcSemiPackageAmount(template) },
+    {
+      category: '人工',
+      amount: (template.labor || []).reduce((s, i) => s + i.unitPrice, 0),
+    },
+    {
+      category: '杂项',
+      amount: (template.misc || []).reduce((s, i) => s + i.unitPrice, 0),
+    },
     { category: '主材', amount: sumEntries(template.materials) },
     ...Object.entries(procurementByCategory).map(([category, amount]) => ({ category, amount })),
   ].filter((row) => row.amount > 0)

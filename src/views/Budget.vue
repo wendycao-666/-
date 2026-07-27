@@ -492,6 +492,7 @@ import BudgetPieChart from '../components/BudgetPieChart.vue'
 
 const CATEGORY_COLORS = {
   设计: '#9254DE',
+  半包: COLORS.primary,
   人工: COLORS.primary,
   主材: COLORS.success,
   基装: COLORS.primary,

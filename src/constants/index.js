@@ -4,7 +4,7 @@ export const STORAGE_KEY = 'decoration_tool_data'
 export const SCHEDULE_VERSION = 3
 
 /** 数据结构版本：升级后自动补全采购等字段并写回本地/云端 */
-export const DATA_VERSION = 13
+export const DATA_VERSION = 15
 
 /** 默认计划开工日（可在项目信息中修改） */
 export const DEFAULT_PROJECT_START_DATE = '2026-07-13'
@@ -123,6 +123,13 @@ export const PROCUREMENT_CATEGORY_TEMPLATES = {
     { name: '封窗', note: '' },
     { name: '瓷砖', note: '全屋通铺，需对接全屋排砖图' },
     { name: '美缝', note: '木纹砖，水性环氧彩砂平缝' },
+    { name: '厨房平开门', note: '铝合金极窄玻璃门' },
+    { name: '卫生间平开门', note: '铝合金极窄油砂玻璃门' },
+    { name: '窗台石', note: '' },
+    { name: '开关插座', note: '奶油色系，公牛/施耐德' },
+    { name: '踢脚线', note: '实木踢脚线' },
+    { name: '铝扣板', note: '卫生间和厨房吊顶' },
+    { name: '五金', note: '地漏、角阀、排水管全套' },
   ],
   custom: [
     { name: '全屋定制', note: '需要找商家要样品，颜色与整体统一' },
@@ -135,6 +142,7 @@ export const PROCUREMENT_CATEGORY_TEMPLATES = {
     { name: '浴室盆', note: '陶瓷一体盆' },
     { name: '浴具', note: '枪灰色' },
     { name: '马桶', note: '轻智能马桶，需座圈加热' },
+    { name: '淋浴房', note: '浴帘' },
   ],
   kitchen: [
     { name: '燃气热水器', note: '零冷水，需冷凝管' },
@@ -148,8 +156,27 @@ export const PROCUREMENT_CATEGORY_TEMPLATES = {
     { name: '风管机', note: '出风口需要加宽' },
     { name: '洗衣机', note: '预留尺寸625*600*865' },
     { name: '扫地机器人', note: '' },
+    { name: '电视机', note: '65~75寸' },
+    { name: '主卧空调', note: '挂机' },
+    { name: '次卧1空调', note: '挂机' },
+    { name: '风扇灯', note: '原木风灯具' },
+    { name: '其他灯具', note: '筒灯+厨房+卫生间平板灯' },
+    { name: '智能锁', note: '不换门，只换智能锁' },
+    { name: '猫眼', note: '' },
+    { name: '摄像头', note: '' },
   ],
-  soft: [{ name: '窗帘', note: '' }],
+  soft: [
+    { name: '窗帘', note: '纱+遮光，含轨道安装' },
+    { name: '沙发', note: '三人位/贵妃，布艺或科技布' },
+    { name: '茶几', note: '' },
+    { name: '地毯', note: '' },
+    { name: '装饰画', note: '' },
+    { name: '餐桌餐椅', note: '4~6人' },
+    { name: '床品垫子', note: '1.8m，含床垫' },
+    { name: '床头柜', note: '' },
+    { name: '浴室收纳', note: '' },
+    { name: '洗衣收纳篮', note: '' },
+  ],
 }
 
 /** 各采购项下单时间规则（归属工序 + 提前天数，用于最晚下单与三色预警） */
@@ -175,6 +202,31 @@ export const PROCUREMENT_ORDER_RULES = {
   浴具: { processName: '安装阶段', advanceDays: 21 },
   马桶: { processName: '安装阶段', advanceDays: 21 },
   窗帘: { processName: '安装阶段', advanceDays: 7 },
+  厨房平开门: { processName: '安装阶段', advanceDays: 30 },
+  卫生间平开门: { processName: '安装阶段', advanceDays: 30 },
+  窗台石: { processName: '泥瓦工程', advanceDays: 10 },
+  开关插座: { processName: '安装阶段', advanceDays: 14 },
+  踢脚线: { processName: '油漆工程', advanceDays: 7 },
+  铝扣板: { processName: '安装阶段', advanceDays: 14 },
+  五金: { processName: '水电改造', advanceDays: 7 },
+  淋浴房: { processName: '安装阶段', advanceDays: 14 },
+  电视机: { processName: '安装阶段', advanceDays: 14 },
+  主卧空调: { processName: '安装阶段', advanceDays: 14 },
+  次卧1空调: { processName: '安装阶段', advanceDays: 14 },
+  风扇灯: { processName: '安装阶段', advanceDays: 14 },
+  其他灯具: { processName: '安装阶段', advanceDays: 14 },
+  智能锁: { processName: '安装阶段', advanceDays: 7 },
+  猫眼: { processName: '安装阶段', advanceDays: 7 },
+  摄像头: { processName: '安装阶段', advanceDays: 7 },
+  沙发: { processName: '安装阶段', advanceDays: 14 },
+  茶几: { processName: '安装阶段', advanceDays: 14 },
+  地毯: { processName: '安装阶段', advanceDays: 7 },
+  装饰画: { processName: '安装阶段', advanceDays: 7 },
+  餐桌餐椅: { processName: '安装阶段', advanceDays: 14 },
+  床品垫子: { processName: '安装阶段', advanceDays: 14 },
+  床头柜: { processName: '安装阶段', advanceDays: 14 },
+  浴室收纳: { processName: '安装阶段', advanceDays: 7 },
+  洗衣收纳篮: { processName: '安装阶段', advanceDays: 7 },
 }
 
 /**
@@ -233,6 +285,7 @@ export const ACCEPTANCE_RESULT = {
 
 export const BUDGET_CATEGORIES = [
   '设计',
+  '半包',
   '人工',
   '主材',
   ...PROCUREMENT_CATEGORIES.map((item) => item.budgetCategory),
@@ -243,15 +296,24 @@ export const BUDGET_CATEGORIES = [
 /** 预算页可手动新增的分类（主材由采购同步，其余品类与采购 Tab 一致） */
 export const MANUAL_BUDGET_CATEGORIES = [
   '设计',
+  '半包',
   '人工',
   ...PROCUREMENT_CATEGORIES.map((item) => item.budgetCategory),
   '杂项',
 ]
 
-/** 人工类：按施工阶段区分，支持填写预算与实际支出 */
+/** 半包：施工方整体报价，不按工序拆分 */
+export const SEMI_PACKAGE_BUDGET_CATEGORY = '半包'
+
+export const SEMI_PACKAGE_BUDGET_ITEM = {
+  name: '半包工程款',
+  note: '半包整体付费（含人工及施工方辅材等），不按工序拆分',
+}
+
+/** 人工类：可选追加，默认不再按工序拆分半包价 */
 export const LABOR_BUDGET_CATEGORY = '人工'
 
-/** 人工费默认项：按 7 道工序区分，仅作占位与备注，不含预算单价 */
+/** 人工费可选项：按 7 道工序区分（半包整体付费时通常不用） */
 export const LABOR_BUDGET_TEMPLATES = [
   { processName: '拆改工程', name: '拆改工程款', note: '开工预付 / 拆改验收合格后支付' },
   { processName: '水电改造', name: '水电工程款', note: '水电改造验收合格后支付' },
