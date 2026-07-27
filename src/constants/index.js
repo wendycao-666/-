@@ -4,7 +4,7 @@ export const STORAGE_KEY = 'decoration_tool_data'
 export const SCHEDULE_VERSION = 3
 
 /** 数据结构版本：升级后自动补全采购等字段并写回本地/云端 */
-export const DATA_VERSION = 15
+export const DATA_VERSION = 16
 
 /** 默认计划开工日（可在项目信息中修改） */
 export const DEFAULT_PROJECT_START_DATE = '2026-07-13'
@@ -40,6 +40,9 @@ export const PROCESS_NAMES = [
   '安装阶段',
   '开荒保洁',
 ]
+
+/** 人工预算可选归属工序（含「其他」，不参与工序排期） */
+export const LABOR_PROCESS_OPTIONS = [...PROCESS_NAMES, '其他']
 
 /** 甘特图工序配色（一级深色、二级浅色） */
 export const PROCESS_GANTT_COLORS = {
@@ -93,21 +96,89 @@ export const PROCESS_SUBTASKS = {
 /** 半包模式：以下为辅材，由施工方提供，不在采购台账展示 */
 export const SEMI_PACKAGE_AUXILIARY_MATERIALS = ['水管管件', '电线底盒', '板材五金']
 
-/** 主材模板（半包：仅业主自购主材，不含辅材） */
-export const MATERIAL_TEMPLATES = [
-  { name: '墙地砖', processName: '泥瓦工程', advanceDays: 15 },
-  { name: '室内木门', processName: '安装阶段', advanceDays: 45 },
-  { name: '橱柜洁具', processName: '安装阶段', advanceDays: 30 },
+/**
+ * 主材模板：硬装 Excel 已拆入采购分类后，默认不再单独占「主材」Tab。
+ * 保留空数组，兼容旧数据迁移与主材同步逻辑。
+ */
+export const MATERIAL_TEMPLATES = []
+
+/**
+ * 采购/预算分类（对齐截图）
+ * - 硬装主材：门窗系统 / 地面材料 / 美缝 / 厨房主材 / 卫生间主材 / 全屋定制 / 基础辅材
+ * - 软装家电：软装家具 / 窗帘 / 厨房家电 / 冰洗 / 空调 / 影音 / 清洁小电 / 灯具 / 个性化
+ */
+export const PROCUREMENT_CATEGORIES = [
+  { key: 'doors', label: '门窗系统', budgetCategory: '门窗系统' },
+  { key: 'floor', label: '地面材料', budgetCategory: '地面材料' },
+  { key: 'grout', label: '美缝', budgetCategory: '美缝' },
+  { key: 'kitchenHard', label: '厨房主材', budgetCategory: '厨房主材' },
+  { key: 'bathroom', label: '卫生间主材', budgetCategory: '卫生间主材' },
+  { key: 'custom', label: '全屋定制', budgetCategory: '全屋定制' },
+  { key: 'aux', label: '基础辅材', budgetCategory: '基础辅材' },
+  { key: 'soft', label: '软装家具', budgetCategory: '软装家具' },
+  { key: 'curtain', label: '窗帘', budgetCategory: '窗帘' },
+  { key: 'kitchen', label: '厨房家电', budgetCategory: '厨房家电' },
+  { key: 'laundry', label: '冰洗', budgetCategory: '冰洗' },
+  { key: 'ac', label: '空调', budgetCategory: '空调' },
+  { key: 'av', label: '影音', budgetCategory: '影音' },
+  { key: 'clean', label: '清洁小电', budgetCategory: '清洁小电' },
+  { key: 'lighting', label: '灯具', budgetCategory: '灯具' },
+  { key: 'personal', label: '个性化', budgetCategory: '个性化' },
 ]
 
-/** 采购台账分类 Tab（统一按品类划分，非空间维度） */
-export const PROCUREMENT_CATEGORIES = [
-  { key: 'base', label: '基装', budgetCategory: '基装' },
-  { key: 'custom', label: '定制', budgetCategory: '定制' },
-  { key: 'bathroom', label: '卫浴洁具', budgetCategory: '卫浴洁具' },
-  { key: 'kitchen', label: '厨电', budgetCategory: '厨电' },
-  { key: 'appliance', label: '家电', budgetCategory: '家电' },
-  { key: 'soft', label: '软装', budgetCategory: '软装' },
+export const PROCUREMENT_DIMENSIONS = {
+  HARD: '硬装主材',
+  SOFT: '软装',
+  APPLIANCE: '家电',
+  OTHER: '其他',
+}
+
+const HARD_BUDGET_CATEGORY_SET = new Set([
+  '门窗系统',
+  '地面材料',
+  '美缝',
+  '厨房主材',
+  '卫生间主材',
+  '全屋定制',
+  '基础辅材',
+  '主材',
+  '辅材',
+])
+
+const SOFT_BUDGET_CATEGORY_SET = new Set(['软装家具', '窗帘', '软装'])
+
+const APPLIANCE_BUDGET_CATEGORY_SET = new Set([
+  '厨房家电',
+  '冰洗',
+  '空调',
+  '影音',
+  '清洁小电',
+  '灯具',
+  '个性化',
+  '家电',
+  '厨电',
+])
+
+export function resolveBudgetDimension(category) {
+  if (HARD_BUDGET_CATEGORY_SET.has(category)) return PROCUREMENT_DIMENSIONS.HARD
+  if (SOFT_BUDGET_CATEGORY_SET.has(category)) return PROCUREMENT_DIMENSIONS.SOFT
+  if (APPLIANCE_BUDGET_CATEGORY_SET.has(category)) return PROCUREMENT_DIMENSIONS.APPLIANCE
+  return PROCUREMENT_DIMENSIONS.OTHER
+}
+
+/** 采购页可筛的大类（不含「其他」） */
+export const PROCUREMENT_DIMENSION_OPTIONS = [
+  PROCUREMENT_DIMENSIONS.HARD,
+  PROCUREMENT_DIMENSIONS.SOFT,
+  PROCUREMENT_DIMENSIONS.APPLIANCE,
+]
+
+/** 预算明细可筛的大类 */
+export const BUDGET_DIMENSION_OPTIONS = [
+  PROCUREMENT_DIMENSIONS.HARD,
+  PROCUREMENT_DIMENSIONS.SOFT,
+  PROCUREMENT_DIMENSIONS.APPLIANCE,
+  PROCUREMENT_DIMENSIONS.OTHER,
 ]
 
 /** 非采购项：在预算「杂项」中初始化（施工/服务类，无需下单跟踪） */
@@ -119,54 +190,36 @@ export const MISC_BUDGET_TEMPLATES = [
 
 /** 各分类采购项目模板（含注意事项，数组顺序即进场顺序） */
 export const PROCUREMENT_CATEGORY_TEMPLATES = {
-  base: [
-    { name: '封窗', note: '' },
-    { name: '瓷砖', note: '全屋通铺，需对接全屋排砖图' },
-    { name: '美缝', note: '木纹砖，水性环氧彩砂平缝' },
+  doors: [
+    { name: '封窗', note: '断桥铝，阳台主卧三层玻璃' },
+    { name: '室内木门', note: '实木复合平板门，含门套合页' },
     { name: '厨房平开门', note: '铝合金极窄玻璃门' },
     { name: '卫生间平开门', note: '铝合金极窄油砂玻璃门' },
+    { name: '智能锁', note: '不换门，只换智能锁' },
+  ],
+  floor: [{ name: '瓷砖', note: '600×1200，通铺，木色瓷砖' }],
+  grout: [{ name: '美缝', note: '木纹砖，水性环氧彩砂平缝' }],
+  kitchenHard: [{ name: '水槽', note: '304 不锈钢大单槽 + 抽拉龙头' }],
+  bathroom: [
+    { name: '浴室盆', note: '陶瓷一体盆' },
+    { name: '浴具', note: '普通花洒' },
+    { name: '马桶', note: '轻智能马桶，需座圈加热' },
+    { name: '淋浴房', note: '浴帘' },
+  ],
+  custom: [
+    {
+      name: '全屋定制',
+      note: '鞋柜 + 主卧衣柜 + 次卧衣柜 + 厨房柜 + 阳台洗衣柜',
+    },
+  ],
+  aux: [
+    { name: '五金', note: '地漏、角阀、排水管全套' },
     { name: '窗台石', note: '' },
     { name: '开关插座', note: '奶油色系，公牛/施耐德' },
     { name: '踢脚线', note: '实木踢脚线' },
     { name: '铝扣板', note: '卫生间和厨房吊顶' },
-    { name: '五金', note: '地漏、角阀、排水管全套' },
-  ],
-  custom: [
-    { name: '全屋定制', note: '需要找商家要样品，颜色与整体统一' },
-    { name: '橱柜', note: '做高低台 83、93' },
-    { name: '餐边柜', note: '' },
-    { name: '电视柜', note: '需要预留电视尺寸' },
-    { name: '水吧台', note: '' },
-  ],
-  bathroom: [
-    { name: '浴室盆', note: '陶瓷一体盆' },
-    { name: '浴具', note: '枪灰色' },
-    { name: '马桶', note: '轻智能马桶，需座圈加热' },
-    { name: '淋浴房', note: '浴帘' },
-  ],
-  kitchen: [
-    { name: '燃气热水器', note: '零冷水，需冷凝管' },
-    { name: '水槽', note: '大单槽就够了' },
-    { name: '烟灶', note: '' },
-    { name: '洗碗机', note: '需带烘干、消毒功能' },
-    { name: '净水器', note: '' },
-  ],
-  appliance: [
-    { name: '平嵌冰箱', note: '平嵌深度605，需要了解宽高' },
-    { name: '风管机', note: '出风口需要加宽' },
-    { name: '洗衣机', note: '预留尺寸625*600*865' },
-    { name: '扫地机器人', note: '' },
-    { name: '电视机', note: '65~75寸' },
-    { name: '主卧空调', note: '挂机' },
-    { name: '次卧1空调', note: '挂机' },
-    { name: '风扇灯', note: '原木风灯具' },
-    { name: '其他灯具', note: '筒灯+厨房+卫生间平板灯' },
-    { name: '智能锁', note: '不换门，只换智能锁' },
-    { name: '猫眼', note: '' },
-    { name: '摄像头', note: '' },
   ],
   soft: [
-    { name: '窗帘', note: '纱+遮光，含轨道安装' },
     { name: '沙发', note: '三人位/贵妃，布艺或科技布' },
     { name: '茶几', note: '' },
     { name: '地毯', note: '' },
@@ -177,11 +230,38 @@ export const PROCUREMENT_CATEGORY_TEMPLATES = {
     { name: '浴室收纳', note: '' },
     { name: '洗衣收纳篮', note: '' },
   ],
+  curtain: [{ name: '窗帘', note: '纱+遮光，含轨道安装' }],
+  kitchen: [
+    { name: '烟灶', note: '侧吸/顶侧，注意预留尺寸' },
+    { name: '洗碗机', note: '嵌入式，与消毒柜二选一常见' },
+    { name: '燃气热水器', note: '燃气16L或电热' },
+    { name: '净水器', note: '前置' },
+  ],
+  laundry: [
+    { name: '平嵌冰箱', note: '法式/十字门等' },
+    { name: '洗衣机', note: '洗烘一体或滚筒' },
+  ],
+  ac: [
+    { name: '风管机', note: '客厅空调，风管机' },
+    { name: '主卧空调', note: '挂机' },
+    { name: '次卧1空调', note: '挂机' },
+  ],
+  av: [{ name: '电视机', note: '65~75寸常见' }],
+  clean: [{ name: '扫地机器人', note: '可选' }],
+  lighting: [
+    { name: '风扇灯', note: '原木风灯具' },
+    { name: '其他灯具', note: '筒灯+厨房+卫生间平板灯' },
+  ],
+  personal: [
+    { name: '猫眼', note: '' },
+    { name: '摄像头', note: '' },
+  ],
 }
 
 /** 各采购项下单时间规则（归属工序 + 提前天数，用于最晚下单与三色预警） */
 export const PROCUREMENT_ORDER_RULES = {
   封窗: { processName: '水电改造', advanceDays: 14 },
+  室内木门: { processName: '安装阶段', advanceDays: 45 },
   瓷砖: { processName: '泥瓦工程', advanceDays: 15 },
   美缝: { processName: '泥瓦工程', advanceDays: 8 },
   全屋定制: { processName: '木作工程', advanceDays: 25 },
@@ -230,34 +310,35 @@ export const PROCUREMENT_ORDER_RULES = {
 }
 
 /**
- * 采购进场顺序（跨主材与各分类，对齐 7 道工序）
+ * 采购进场顺序（跨分类，对齐 7 道工序）
  * type: material | procurement
  */
 export const PROCUREMENT_ENTRY_SEQUENCE = [
-  { phase: '水电', type: 'procurement', listKey: 'base', name: '封窗' },
-  { phase: '泥瓦', type: 'material', name: '墙地砖' },
-  { phase: '泥瓦', type: 'procurement', listKey: 'base', name: '瓷砖' },
-  { phase: '泥瓦', type: 'procurement', listKey: 'base', name: '美缝' },
+  { phase: '水电', type: 'procurement', listKey: 'doors', name: '封窗' },
+  { phase: '水电', type: 'procurement', listKey: 'aux', name: '五金' },
+  { phase: '泥瓦', type: 'procurement', listKey: 'floor', name: '瓷砖' },
+  { phase: '泥瓦', type: 'procurement', listKey: 'grout', name: '美缝' },
+  { phase: '泥瓦', type: 'procurement', listKey: 'aux', name: '窗台石' },
   { phase: '木作', type: 'procurement', listKey: 'custom', name: '全屋定制' },
-  { phase: '木作', type: 'procurement', listKey: 'appliance', name: '风管机' },
-  { phase: '安装', type: 'material', name: '室内木门' },
-  { phase: '安装', type: 'material', name: '橱柜洁具' },
-  { phase: '安装', type: 'procurement', listKey: 'custom', name: '橱柜' },
-  { phase: '安装', type: 'procurement', listKey: 'custom', name: '餐边柜' },
-  { phase: '安装', type: 'procurement', listKey: 'custom', name: '电视柜' },
-  { phase: '安装', type: 'procurement', listKey: 'custom', name: '水吧台' },
-  { phase: '厨电', type: 'procurement', listKey: 'kitchen', name: '燃气热水器' },
-  { phase: '厨电', type: 'procurement', listKey: 'kitchen', name: '水槽' },
+  { phase: '木作', type: 'procurement', listKey: 'ac', name: '风管机' },
+  { phase: '安装', type: 'procurement', listKey: 'doors', name: '室内木门' },
+  { phase: '安装', type: 'procurement', listKey: 'doors', name: '厨房平开门' },
+  { phase: '安装', type: 'procurement', listKey: 'doors', name: '卫生间平开门' },
+  { phase: '安装', type: 'procurement', listKey: 'kitchenHard', name: '水槽' },
+  { phase: '安装', type: 'procurement', listKey: 'bathroom', name: '浴室盆' },
+  { phase: '安装', type: 'procurement', listKey: 'bathroom', name: '浴具' },
+  { phase: '安装', type: 'procurement', listKey: 'bathroom', name: '马桶' },
+  { phase: '安装', type: 'procurement', listKey: 'bathroom', name: '淋浴房' },
   { phase: '厨电', type: 'procurement', listKey: 'kitchen', name: '烟灶' },
   { phase: '厨电', type: 'procurement', listKey: 'kitchen', name: '洗碗机' },
+  { phase: '厨电', type: 'procurement', listKey: 'kitchen', name: '燃气热水器' },
   { phase: '厨电', type: 'procurement', listKey: 'kitchen', name: '净水器' },
-  { phase: '家电', type: 'procurement', listKey: 'appliance', name: '平嵌冰箱' },
-  { phase: '卫浴洁具', type: 'procurement', listKey: 'bathroom', name: '浴室盆' },
-  { phase: '卫浴洁具', type: 'procurement', listKey: 'bathroom', name: '浴具' },
-  { phase: '卫浴洁具', type: 'procurement', listKey: 'bathroom', name: '马桶' },
-  { phase: '家电', type: 'procurement', listKey: 'appliance', name: '扫地机器人' },
-  { phase: '家电', type: 'procurement', listKey: 'appliance', name: '洗衣机' },
-  { phase: '软装', type: 'procurement', listKey: 'soft', name: '窗帘' },
+  { phase: '家电', type: 'procurement', listKey: 'laundry', name: '平嵌冰箱' },
+  { phase: '家电', type: 'procurement', listKey: 'laundry', name: '洗衣机' },
+  { phase: '家电', type: 'procurement', listKey: 'clean', name: '扫地机器人' },
+  { phase: '影音', type: 'procurement', listKey: 'av', name: '电视机' },
+  { phase: '灯具', type: 'procurement', listKey: 'lighting', name: '风扇灯' },
+  { phase: '软装', type: 'procurement', listKey: 'curtain', name: '窗帘' },
 ]
 
 export const ACCEPTANCE_STATUS = {
@@ -287,13 +368,13 @@ export const BUDGET_CATEGORIES = [
   '设计',
   '半包',
   '人工',
-  '主材',
   ...PROCUREMENT_CATEGORIES.map((item) => item.budgetCategory),
+  '主材',
   '辅材',
   '杂项',
 ]
 
-/** 预算页可手动新增的分类（主材由采购同步，其余品类与采购 Tab 一致） */
+/** 预算页可手动新增的分类（与采购 Tab 对齐 Excel 维度） */
 export const MANUAL_BUDGET_CATEGORIES = [
   '设计',
   '半包',

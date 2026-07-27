@@ -105,14 +105,27 @@
         <el-button link type="primary" @click="switchToUrgencyView">返回待处理</el-button>
       </div>
 
+      <div class="dimension-filter-bar">
+        <el-radio-group v-model="dimensionFilter" size="small">
+          <el-radio-button label="">全部</el-radio-button>
+          <el-radio-button
+            v-for="dim in PROCUREMENT_DIMENSION_OPTIONS"
+            :key="dim"
+            :label="dim"
+          >
+            {{ dim }}
+          </el-radio-button>
+        </el-radio-group>
+      </div>
+
     <el-tabs v-model="activeTab" class="procurement-tabs">
-      <el-tab-pane label="主材" name="material">
+      <el-tab-pane v-if="showMaterialTab" label="主材" name="material">
         <MaterialSection :name-order="materialNameOrder" :highlight-id="materialHighlightId" />
       </el-tab-pane>
       <el-tab-pane
-        v-for="category in visibleCategories"
+        v-for="category in filteredCategories"
         :key="category.key"
-        :label="category.label"
+        :label="categoryTabLabel(category)"
         :name="category.key"
       >
         <ProcurementSection
@@ -125,6 +138,7 @@
         />
       </el-tab-pane>
     </el-tabs>
+    <EmptyState v-if="!filteredCategories.length && !showMaterialTab" text="该大类下暂无采购分类" />
     </section>
   </div>
 </template>
@@ -133,7 +147,7 @@
 import { ref, watch, computed, onMounted, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { PROCUREMENT_CATEGORIES, PROCUREMENT_CATEGORY_TEMPLATES } from '../constants'
+import { PROCUREMENT_CATEGORIES, PROCUREMENT_CATEGORY_TEMPLATES, PROCUREMENT_DIMENSION_OPTIONS, PROCUREMENT_DIMENSIONS, resolveBudgetDimension } from '../constants'
 import { useAppStore } from '../composables/useAppStore'
 import { getMaterialNameOrder, sortProcurementItems } from '../utils/procurementSequence'
 import {
@@ -192,15 +206,52 @@ const visibleCategories = PROCUREMENT_CATEGORIES.filter(
   (category) => (PROCUREMENT_CATEGORY_TEMPLATES[category.key] || []).length > 0
 )
 
-const TAB_NAMES = ['material', ...visibleCategories.map((item) => item.key)]
-const LEGACY_TAB_MAP = { living: 'appliance', balcony: 'appliance' }
+const dimensionFilter = ref('')
+
+const filteredCategories = computed(() => {
+  if (!dimensionFilter.value) return visibleCategories
+  return visibleCategories.filter(
+    (category) => resolveBudgetDimension(category.budgetCategory) === dimensionFilter.value
+  )
+})
+
+const showMaterialTab = computed(
+  () =>
+    state.materials.length > 0 &&
+    (!dimensionFilter.value || dimensionFilter.value === PROCUREMENT_DIMENSIONS.HARD)
+)
+
+const TAB_NAMES = computed(() => [
+  ...(showMaterialTab.value ? ['material'] : []),
+  ...filteredCategories.value.map((item) => item.key),
+])
+
+const LEGACY_TAB_MAP = {
+  living: 'soft',
+  balcony: 'laundry',
+  base: 'doors',
+  appliance: 'laundry',
+  material: 'doors',
+}
 
 function resolveTab(tab) {
   const mapped = LEGACY_TAB_MAP[tab] || tab
-  return TAB_NAMES.includes(mapped) ? mapped : 'material'
+  if (TAB_NAMES.value.includes(mapped)) return mapped
+  return filteredCategories.value[0]?.key || (showMaterialTab.value ? 'material' : 'doors')
+}
+
+function categoryTabLabel(category) {
+  return `${resolveBudgetDimension(category.budgetCategory)} · ${category.label}`
 }
 
 const activeTab = ref(resolveTab(route.query.tab))
+
+watch(dimensionFilter, () => {
+  const resolved = resolveTab(activeTab.value)
+  if (resolved !== activeTab.value) {
+    activeTab.value = resolved
+  }
+})
 
 watch(activeTab, (tab) => {
   if (warningFilter.value || processFilter.value || pageMode.value === 'urgency') return
@@ -450,6 +501,15 @@ function normalizePayload(item) {
   background: #faf6f2;
   border: 1px solid rgba(184, 115, 74, 0.15);
   border-radius: 8px;
+}
+.dimension-filter-bar {
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+.dimension-filter-bar :deep(.el-radio-group) {
+  display: flex;
+  flex-wrap: nowrap;
+  width: max-content;
 }
 .filter-title {
   font-size: 14px;

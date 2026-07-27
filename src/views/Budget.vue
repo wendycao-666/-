@@ -143,9 +143,22 @@
       <EmptyState v-if="!visibleBudgets.length" />
 
       <div v-if="visibleBudgets.length" class="budget-detail-list">
+        <div class="dimension-filter-bar">
+          <el-radio-group v-model="dimensionFilter" size="small">
+            <el-radio-button label="">全部</el-radio-button>
+            <el-radio-button
+              v-for="dim in BUDGET_DIMENSION_OPTIONS"
+              :key="dim"
+              :label="dim"
+            >
+              {{ dim }}
+            </el-radio-button>
+          </el-radio-group>
+        </div>
+        <EmptyState v-if="!filteredBudgetDetailGroups.length" text="该大类下暂无预算项" />
         <el-collapse v-model="expandedCategories" class="category-collapse">
           <el-collapse-item
-            v-for="group in budgetDetailGroups"
+            v-for="group in filteredBudgetDetailGroups"
             :key="group.category"
             :name="group.category"
           >
@@ -153,7 +166,7 @@
               <div class="category-collapse-title">
                 <span class="category-dot" :style="{ background: getCategoryColor(group.category) }" />
                 <div class="category-head-main">
-                  <span class="category-title">{{ group.category }}</span>
+                  <span class="category-title">{{ group.dimension }} · {{ group.category }}</span>
                   <span class="category-meta">
                     {{ group.count }} 项 · 规划 ¥ {{ formatMoney(group.budgetTotal) }} · 已花 ¥ {{ formatMoney(group.paidTotal) }}
                   </span>
@@ -351,7 +364,12 @@
             style="width: 100%"
             :disabled="form.procurementLinked"
           >
-            <el-option v-for="process in PROCESS_NAMES" :key="process" :label="process" :value="process" />
+            <el-option
+              v-for="process in LABOR_PROCESS_OPTIONS"
+              :key="process"
+              :label="process"
+              :value="process"
+            />
           </el-select>
         </el-form-item>
         <el-form-item label="项目名称" required>
@@ -454,12 +472,15 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import {
   BUDGET_CATEGORIES,
+  BUDGET_DIMENSION_OPTIONS,
   MANUAL_BUDGET_CATEGORIES,
   COLORS,
   LABOR_BUDGET_CATEGORY,
   LABOR_BUDGET_TEMPLATES,
   OVERALL_BUDGET,
   PROCESS_NAMES,
+  LABOR_PROCESS_OPTIONS,
+  resolveBudgetDimension,
 } from '../constants'
 import {
   calcBudgetItemTotal,
@@ -494,6 +515,22 @@ const CATEGORY_COLORS = {
   设计: '#9254DE',
   半包: COLORS.primary,
   人工: COLORS.primary,
+  门窗系统: COLORS.primary,
+  地面材料: COLORS.success,
+  美缝: '#C9923A',
+  厨房主材: '#E6A23C',
+  卫生间主材: '#00BCD4',
+  全屋定制: '#9C27B0',
+  基础辅材: COLORS.warning,
+  软装家具: '#13C2C2',
+  窗帘: '#36CFC9',
+  厨房家电: '#E6A23C',
+  冰洗: '#2F54EB',
+  空调: '#597EF7',
+  影音: '#722ED1',
+  清洁小电: '#52C41A',
+  灯具: '#FAAD14',
+  个性化: '#EB2F96',
   主材: COLORS.success,
   基装: COLORS.primary,
   定制: '#9C27B0',
@@ -574,6 +611,7 @@ const budgetDetailGroups = computed(() =>
     const paidTotal = items.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0)
     return {
       category,
+      dimension: resolveBudgetDimension(category),
       items,
       count: items.length,
       budgetTotal,
@@ -582,11 +620,17 @@ const budgetDetailGroups = computed(() =>
   }).filter(Boolean)
 )
 
+const dimensionFilter = ref('')
+const filteredBudgetDetailGroups = computed(() => {
+  if (!dimensionFilter.value) return budgetDetailGroups.value
+  return budgetDetailGroups.value.filter((group) => group.dimension === dimensionFilter.value)
+})
+
 const dialogVisible = ref(false)
 const editingId = ref('')
 const skipCategorySideEffect = ref(false)
 const expandedCategories = ref([])
-const expandedLaborPanels = ref([...PROCESS_NAMES, '未指定工序'])
+const expandedLaborPanels = ref([...LABOR_PROCESS_OPTIONS, '未指定工序'])
 const expandedBudgetItems = ref([])
 
 watch(
@@ -601,6 +645,11 @@ watch(
   },
   { immediate: true }
 )
+
+watch(dimensionFilter, () => {
+  const names = new Set(filteredBudgetDetailGroups.value.map((group) => group.category))
+  expandedCategories.value = expandedCategories.value.filter((name) => names.has(name))
+})
 
 onMounted(() => {
   if (route.query.expand === 'detail' || route.query.expand === 'sync' || route.query.focus === 'overall') {
@@ -808,7 +857,7 @@ const form = reactive({
 })
 
 function getLaborSubgroups(items) {
-  const groups = PROCESS_NAMES.map((processName) => {
+  const groups = LABOR_PROCESS_OPTIONS.map((processName) => {
     const subItems = items.filter((item) => item.processName === processName)
     if (!subItems.length) return null
     const paidTotal = subItems.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0)
@@ -817,7 +866,7 @@ function getLaborSubgroups(items) {
   }).filter(Boolean)
 
   const unassigned = items.filter(
-    (item) => !item.processName || !PROCESS_NAMES.includes(item.processName)
+    (item) => !item.processName || !LABOR_PROCESS_OPTIONS.includes(item.processName)
   )
   if (unassigned.length) {
     groups.push({
@@ -1164,6 +1213,15 @@ function remove(id) {
 }
 .budget-detail-list {
   margin-top: 12px;
+}
+.dimension-filter-bar {
+  margin-bottom: 12px;
+  overflow-x: auto;
+}
+.dimension-filter-bar :deep(.el-radio-group) {
+  display: flex;
+  flex-wrap: nowrap;
+  width: max-content;
 }
 .category-collapse {
   border: none;

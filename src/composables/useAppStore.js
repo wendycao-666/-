@@ -152,25 +152,31 @@ function loadProcurementLists(saved) {
   const defaults = createDefaultProcurementLists()
   let migrated = !saved?.procurementLists
 
-  if (saved?.procurementLists) {
-    PROCUREMENT_CATEGORIES.forEach(({ key }) => {
-      const merged = mergeProcurementLists(saved.procurementLists[key], defaults[key])
-      defaults[key] = merged.items
-      migrated = migrated || merged.migrated
-    })
-  }
-
+  const savedByName = collectSavedProcurementByName(saved?.procurementLists)
+  ;(saved?.materials || []).forEach((item) => {
+    if (item?.name) savedByName[item.name] = item
+  })
   if (saved?.softFurnishings?.length) {
-    const merged = mergeProcurementLists(saved.softFurnishings, defaults.soft)
-    defaults.soft = merged.items
+    saved.softFurnishings.forEach((item) => {
+      if (item?.name) savedByName[item.name] = item
+    })
+    migrated = true
+  }
+  if (saved?.appliances?.length) {
+    saved.appliances.forEach((item) => {
+      if (item?.name) savedByName[item.name] = item
+    })
     migrated = true
   }
 
-  if (saved?.appliances?.length) {
-    const merged = mergeProcurementLists(saved.appliances, defaults.appliance)
-    defaults.appliance = merged.items
-    migrated = true
-  }
+  PROCUREMENT_CATEGORIES.forEach(({ key }) => {
+    const defaultItems = defaults[key] || []
+    const savedItems = defaultItems.map((def) => savedByName[def.name]).filter(Boolean)
+    const fromSameKey = saved?.procurementLists?.[key] || []
+    const merged = mergeProcurementLists([...savedItems, ...fromSameKey], defaultItems)
+    defaults[key] = merged.items
+    migrated = migrated || merged.migrated || savedItems.length > 0
+  })
 
   if (!saved?.procurementLists && !saved?.softFurnishings?.length && !saved?.appliances?.length) {
     migrated = true
@@ -443,15 +449,23 @@ function migrateProcurementListsV4(savedLists) {
 }
 
 const BUDGET_CATEGORY_MIGRATION_V4 = {
-  厨房: '厨电',
-  卫浴: '卫浴洁具',
-  客厅: '家电',
-  阳台: '家电',
+  厨房: '厨房家电',
+  卫浴: '卫生间主材',
+  卫浴洁具: '卫生间主材',
+  客厅: '软装家具',
+  阳台: '冰洗',
+  基装: '门窗系统',
+  定制: '全屋定制',
+  厨电: '厨房家电',
+  软装: '软装家具',
+  家电: '冰洗',
 }
 
 const PROCUREMENT_KEY_MIGRATION_V4 = {
-  living: 'appliance',
-  balcony: 'appliance',
+  living: 'soft',
+  balcony: 'laundry',
+  base: 'doors',
+  appliance: 'laundry',
 }
 
 function migrateBudgetsV4(budgets, procurementLists) {
@@ -598,8 +612,26 @@ function applySavedData(saved) {
       migrated = true
     }
   }
+  if (!saved.dataVersion || saved.dataVersion < 16) {
+    // Excel 维度重划后，按采购项同步预算分类；清理已迁走的空主材预算
+    state.budgets = state.budgets.filter((budget) => {
+      if (!budget.materialId) return true
+      return state.materials.some((item) => item.id === budget.materialId)
+    })
+    migrated = true
+  }
   syncAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
   cleanupAllProcurementBudgets(state.materials, state.procurementLists, state.budgets)
+
+  // 旧分类名兜底改写（无采购关联的手动项）
+  if (!saved.dataVersion || saved.dataVersion < 16) {
+    state.budgets = state.budgets.map((budget) => {
+      const mapped = BUDGET_CATEGORY_MIGRATION_V4[budget.category]
+      if (!mapped || budget.procurementKey || budget.materialId) return budget
+      return { ...budget, category: mapped }
+    })
+    migrated = true
+  }
 
   if (!saved.userQuoteVersion || saved.userQuoteVersion < USER_QUOTE_VERSION) {
     applyUserQuotePreset(state)

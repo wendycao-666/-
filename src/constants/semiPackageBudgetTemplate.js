@@ -163,12 +163,22 @@ export function getSemiPackageTemplateBreakdown(template = SEMI_PACKAGE_BUDGET_T
   Object.entries(template.procurement || {}).forEach(([listKey, items]) => {
     const categoryLabel =
       {
-        base: '基装',
-        custom: '定制',
-        bathroom: '卫浴洁具',
-        kitchen: '厨电',
-        appliance: '家电',
-        soft: '软装',
+        doors: '门窗系统',
+        floor: '地面材料',
+        grout: '美缝',
+        kitchenHard: '厨房主材',
+        bathroom: '卫生间主材',
+        custom: '全屋定制',
+        aux: '基础辅材',
+        soft: '软装家具',
+        curtain: '窗帘',
+        kitchen: '厨房家电',
+        laundry: '冰洗',
+        ac: '空调',
+        av: '影音',
+        clean: '清洁小电',
+        lighting: '灯具',
+        personal: '个性化',
       }[listKey] || listKey
     procurementByCategory[categoryLabel] = sumEntries(items)
   })
