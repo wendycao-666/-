@@ -57,14 +57,18 @@
         </div>
         <div class="template-ref-stats">
           <div class="template-ref-stat">
-            <span class="template-ref-stat-label">参考规划合计</span>
-            <span class="template-ref-stat-value">¥ {{ formatMoney(templatePlanningTotal) }}</span>
+            <span class="template-ref-stat-label">主材+软装预估</span>
+            <span class="template-ref-stat-value">¥ {{ formatEstimateMoney(estimateMaterialAndSoftTotal) }}</span>
           </div>
           <div class="template-ref-stat">
-            <span class="template-ref-stat-label">建议整体规划</span>
-            <span class="template-ref-stat-value">¥ {{ formatMoney(scaledSemiPackageTemplate.overallBudget) }}</span>
+            <span class="template-ref-stat-label">加半包后合计</span>
+            <span class="template-ref-stat-value">¥ {{ formatEstimateMoney(estimateTotalWithSemiPackage) }}</span>
           </div>
         </div>
+        <p class="template-ref-kpi-note">
+          主材 ¥{{ formatEstimateMoney(estimateHardTotal) }} + 软装 ¥{{ formatEstimateMoney(estimateSoftTotal) }} + 半包
+          ¥{{ formatEstimateMoney(estimateSemiPackageTotal) }}
+        </p>
         <div class="template-ref-actions">
           <el-button round @click="templateDetailVisible = true">查看参考明细</el-button>
           <el-button type="primary" round @click="handleApplyTemplate">填入参考价</el-button>
@@ -478,8 +482,11 @@ import {
   LABOR_BUDGET_CATEGORY,
   LABOR_BUDGET_TEMPLATES,
   OVERALL_BUDGET,
+  PROCUREMENT_CATEGORIES,
+  PROCUREMENT_DIMENSIONS,
   PROCESS_NAMES,
   LABOR_PROCESS_OPTIONS,
+  SEMI_PACKAGE_BUDGET_CATEGORY,
   resolveBudgetDimension,
 } from '../constants'
 import {
@@ -556,6 +563,54 @@ const hasTemplateReference = computed(() =>
   hasSemiPackageReference(state, scaledSemiPackageTemplate.value)
 )
 
+const procurementCategoryByKey = Object.fromEntries(
+  PROCUREMENT_CATEGORIES.map((item) => [item.key, item])
+)
+
+function sumProcurementPlanning(items = []) {
+  return items.reduce(
+    (sum, item) => sum + Number(item.unitPrice || 0) * (Number(item.quantity || 1) || 1),
+    0
+  )
+}
+
+const estimateHardTotal = computed(() =>
+  Object.entries(state.procurementLists || {}).reduce((sum, [listKey, items]) => {
+    const config = procurementCategoryByKey[listKey]
+    if (!config) return sum
+    return resolveBudgetDimension(config.budgetCategory) === PROCUREMENT_DIMENSIONS.HARD
+      ? sum + sumProcurementPlanning(items)
+      : sum
+  }, 0)
+)
+
+const estimateSoftTotal = computed(() =>
+  Object.entries(state.procurementLists || {}).reduce((sum, [listKey, items]) => {
+    const config = procurementCategoryByKey[listKey]
+    if (!config) return sum
+    const dim = resolveBudgetDimension(config.budgetCategory)
+    return dim === PROCUREMENT_DIMENSIONS.SOFT || dim === PROCUREMENT_DIMENSIONS.APPLIANCE
+      ? sum + sumProcurementPlanning(items)
+      : sum
+  }, 0)
+)
+
+const estimateSemiPackageTotal = computed(() => {
+  const fallback = Number(scaledSemiPackageTemplate.value?.semiPackage?.unitPrice || 0)
+  const semi = state.budgets.find((item) => item.category === SEMI_PACKAGE_BUDGET_CATEGORY)
+  if (!semi) return fallback
+  const planned = calcBudgetItemPlanningAmount(semi)
+  return planned > 0 ? planned : fallback
+})
+
+const estimateMaterialAndSoftTotal = computed(
+  () => estimateHardTotal.value + estimateSoftTotal.value
+)
+
+const estimateTotalWithSemiPackage = computed(
+  () => estimateMaterialAndSoftTotal.value + estimateSemiPackageTotal.value
+)
+
 watch(
   () => state.house.area,
   (area) => {
@@ -571,6 +626,16 @@ function onQuoteAreaChange(value) {
     address: state.house.address,
     overallBudget: state.house.overallBudget,
   })
+}
+
+function formatEstimateMoney(val) {
+  const num = Number(val || 0)
+  const sign = num < 0 ? '-' : ''
+  const abs = Math.abs(num)
+  if (abs >= 10000) {
+    return `${sign}${(abs / 10000).toFixed(2)}w`
+  }
+  return `${sign}${abs.toFixed(2)}`
 }
 
 const route = useRoute()
@@ -1428,6 +1493,12 @@ function remove(id) {
   font-size: 16px;
   font-weight: 600;
   color: var(--reno-primary);
+}
+.template-ref-kpi-note {
+  margin: -6px 0 12px;
+  font-size: 12px;
+  color: #909399;
+  line-height: 1.5;
 }
 .template-ref-actions {
   display: flex;
