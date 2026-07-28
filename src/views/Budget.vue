@@ -134,7 +134,7 @@
           </div>
         </div>
         <div v-if="visibleBudgetSummary.isOverBudget && !visibleBudgetSummary.isOverOverallBudget" class="over-budget">
-          明细项已超支，比规划多花了 ¥ {{ formatMoney(visibleBudgetSummary.totalPaid - visibleBudgetSummary.totalBudget) }}
+          明细项已超支，比规划多花了 ¥ {{ formatMoney(visibleBudgetSummary.totalActual - visibleBudgetSummary.totalBudget) }}
         </div>
       </el-card>
 
@@ -491,7 +491,7 @@ import {
 } from '../constants'
 import {
   calcBudgetItemTotal,
-  calcBudgetCategoryActualStats,
+  calcBudgetCategoryPaidStats,
   calcBudgetItemVariance,
   calcBudgetSummary,
   calcBudgetItemPlanningAmount,
@@ -659,7 +659,7 @@ const overallPaidPercent = computed(() => {
 })
 
 const categoryChartData = computed(() => {
-  const stats = calcBudgetCategoryActualStats(visibleBudgets.value, BUDGET_CATEGORIES)
+  const stats = calcBudgetCategoryPaidStats(visibleBudgets.value, BUDGET_CATEGORIES)
   const total = stats.reduce((sum, item) => sum + item.amount, 0) || 1
   return stats.map((item) => ({
     key: item.category,

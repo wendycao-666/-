@@ -61,18 +61,19 @@ export function calcBudgetSummary(budgets, overallBudget = OVERALL_BUDGET) {
   const totalBudget = budgets.reduce((sum, item) => sum + calcBudgetItemPlanningAmount(item), 0)
   const totalActual = budgets.reduce((sum, item) => sum + Number(item.actualAmount || 0), 0)
   const totalPaid = budgets.reduce((sum, item) => sum + Number(item.paidAmount || 0), 0)
-  const variance = totalBudget - totalPaid
+  // 明细「还能花」对齐「已经花出去」：规划合计 - 实际花费
+  const variance = totalBudget - totalActual
   const overallRemaining = overallBudget - totalPaid
   return {
     totalBudget,
     totalActual,
     totalPaid,
     variance,
-    remaining: totalBudget - totalPaid,
+    remaining: variance,
     unpaid: totalBudget - totalPaid,
     overallBudget,
     overallRemaining,
-    isOverBudget: totalPaid > totalBudget,
+    isOverBudget: totalActual > totalBudget,
     isOverOverallBudget: totalPaid > overallBudget,
   }
 }
@@ -100,6 +101,18 @@ export function calcBudgetCategoryStats(budgets, categories) {
     .filter((item) => item.amount > 0)
 }
 
+/** 分类已付统计（用于占比图，严格按 paidAmount） */
+export function calcBudgetCategoryPaidStats(budgets, categories) {
+  return categories
+    .map((category) => ({
+      category,
+      amount: budgets
+        .filter((item) => item.category === category)
+        .reduce((sum, item) => sum + Number(item.paidAmount || 0), 0),
+    }))
+    .filter((item) => item.amount > 0)
+}
+
 /** 单项实际支出：优先已支付，否则取实际费用 */
 export function getBudgetItemActualSpend(item) {
   const paid = Number(item.paidAmount || 0)
@@ -107,7 +120,7 @@ export function getBudgetItemActualSpend(item) {
   return Number(item.actualAmount || 0)
 }
 
-/** 分类实际支出统计（用于占比图） */
+/** 分类实际支出统计（优先已付，否则实际费用） */
 export function calcBudgetCategoryActualStats(budgets, categories) {
   return categories
     .map((category) => ({
