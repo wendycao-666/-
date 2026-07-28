@@ -596,7 +596,9 @@ const estimateSoftTotal = computed(() =>
 )
 
 const estimateSemiPackageTotal = computed(() => {
-  const fallback = Number(scaledSemiPackageTemplate.value?.semiPackage?.unitPrice || 0)
+  const fallback = Number(
+    scaledSemiPackageTemplate.value?.semiPackage?.unitPrice || 60000
+  )
   const semi = state.budgets.find((item) => item.category === SEMI_PACKAGE_BUDGET_CATEGORY)
   if (!semi) return fallback
   const planned = calcBudgetItemPlanningAmount(semi)

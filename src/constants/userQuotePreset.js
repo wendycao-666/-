@@ -2,13 +2,13 @@
  * 鼎盛锦城项目报价预估（来自预算截图）
  * 分类维度对齐：硬装二级分类 + 软装家电空间/分组。
  */
-export const USER_QUOTE_VERSION = 5
+export const USER_QUOTE_VERSION = 6
 
 export const USER_QUOTE_PRESET = {
   label: '鼎盛锦城报价预估',
   semiPackage: {
     name: '半包工程款',
-    unitPrice: 0,
+    unitPrice: 60000,
     quantity: 1,
     note: '半包整体付费（含人工及施工方辅材等），不按工序拆分',
   },
