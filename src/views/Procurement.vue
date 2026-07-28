@@ -176,13 +176,16 @@ const warningFilter = ref('')
 const processFilter = ref('')
 const pageMode = ref('urgency')
 const filterSectionRef = ref(null)
+const AUTO_IMPORT_TOAST_KEY = 'procurement-auto-import-toast-shown'
 
 onMounted(() => {
   refreshWarningsIfNeeded()
   applyFiltersFromQuery()
   const { filledCount } = importUserQuoteEstimates()
-  if (filledCount > 0) {
+  const hasShownAutoImportToast = sessionStorage.getItem(AUTO_IMPORT_TOAST_KEY) === '1'
+  if (filledCount > 0 && !hasShownAutoImportToast) {
     ElMessage.success(`已自动导入 ${filledCount} 项预估报价`)
+    sessionStorage.setItem(AUTO_IMPORT_TOAST_KEY, '1')
   }
 })
 
