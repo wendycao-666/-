@@ -166,7 +166,7 @@ export function syncBudgetToProcurement(budget, item) {
   if (budget.unitPrice !== undefined) item.unitPrice = Number(budget.unitPrice || 0)
   if (budget.quantity !== undefined) item.quantity = Number(budget.quantity || 1) || 1
   if (budget.paidAmount !== undefined) item.paidAmount = Number(budget.paidAmount || 0)
-  item.cost = Number(item.cost || budget.actualAmount || 0)
+  if (budget.actualAmount !== undefined) item.cost = Number(budget.actualAmount || 0)
 }
 
 export function syncBudgetToMaterial(budget, material) {

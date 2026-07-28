@@ -412,14 +412,15 @@
         </el-form-item>
         <el-form-item label="实际花了多少">
           <el-input-number
-            v-if="!form.procurementLinked"
             v-model="form.actualAmount"
             :min="0"
             :precision="2"
             controls-position="right"
             style="width: 100%"
           />
-          <span v-else class="readonly-value">¥ {{ formatMoney(form.actualAmount) }}（来自{{ form.procurementPage }}采购）</span>
+          <div v-if="form.procurementLinked" class="field-hint">
+            保存后将同步回「{{ form.procurementPage }}」采购条目
+          </div>
         </el-form-item>
         <el-form-item label="已付出去">
           <el-input-number
@@ -1437,6 +1438,11 @@ function remove(id) {
 .readonly-value {
   font-weight: 600;
   color: var(--reno-primary);
+}
+.field-hint {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #909399;
 }
 .template-ref-card {
   margin-top: 12px;
