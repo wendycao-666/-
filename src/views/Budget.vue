@@ -57,7 +57,7 @@
         </div>
         <div class="template-ref-stats">
           <div class="template-ref-stat">
-            <span class="template-ref-stat-label">主材+软装预估</span>
+            <span class="template-ref-stat-label">主材+软装家电预估</span>
             <span class="template-ref-stat-value">¥ {{ formatEstimateMoney(estimateMaterialAndSoftTotal) }}</span>
           </div>
           <div class="template-ref-stat">
@@ -66,7 +66,7 @@
           </div>
         </div>
         <p class="template-ref-kpi-note">
-          主材 ¥{{ formatEstimateMoney(estimateHardTotal) }} + 软装 ¥{{ formatEstimateMoney(estimateSoftTotal) }} + 半包
+          主材 ¥{{ formatEstimateMoney(estimateHardTotal) }} + 软装家电 ¥{{ formatEstimateMoney(estimateSoftTotal) }} + 半包
           ¥{{ formatEstimateMoney(estimateSemiPackageTotal) }}
         </p>
         <div class="template-ref-actions">

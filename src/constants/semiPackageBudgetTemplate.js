@@ -14,7 +14,7 @@ export const SEMI_PACKAGE_BUDGET_TEMPLATE = {
   areaSqm: 100,
   areaHint: '100㎡',
   description:
-    '半包工程款为整体付费一项；主材与采购项按截图预估。仅填充尚未填写的规划单价，不会覆盖已有花费记录。',
+    '统计口径为主材 + 软装家电 + 半包（半包整体付费）。下方按钮仅填充尚未填写的规划单价，不会覆盖已有花费记录。',
   overallBudget: 200000,
   design: [
     {
@@ -98,7 +98,7 @@ export function buildSemiPackageTemplateForArea(
     ...base,
     areaSqm: area,
     areaHint: `${area}㎡`,
-    description: `按 ${area}㎡ 估算：半包工程款整体付费；主材与采购项由业主自购。仅填充尚未填写的规划单价，不会覆盖已有花费记录。`,
+    description: `按 ${area}㎡ 估算：统计口径为主材 + 软装家电 + 半包（半包按整体付费）。下方按钮仅填充尚未填写的规划单价，不会覆盖已有花费记录。`,
     overallBudget: Math.round(Number(base.overallBudget || 0) * ratio),
     design: (base.design || []).map((item) => ({
       ...item,
